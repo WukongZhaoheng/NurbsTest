@@ -1,0 +1,747 @@
+//#CalculationBase
+#ifndef CalculationBase
+#define CalculationBase
+
+#include <iostream>
+#include <math.h>
+#include <vector>
+
+
+double EP = 1E-6;           //定义极小值
+double PI = 3.14159265;     //PI用于角度转弧度
+
+struct POINT            //点结构
+{
+	double x;
+	double y;
+	double z;
+	POINT(double a = 0, double b = 0, double c = 0) { x = a; y = b; z = c; }
+};
+
+struct LINESEG //线段结构
+{
+	POINT s;
+	POINT e;
+	LINESEG() {};
+	LINESEG(POINT a, POINT b) { s = a; e = b; }
+};
+
+struct Line  //直线方程（a*x+b*y+c=0;a>0）
+{
+	double a;
+	double b;
+	double c;
+	Line(double L1 = 1, double L2 = -1, double L3 = 0) { a = L1; b = L2; c = L3; }
+};
+
+struct DVector  //空间向量
+{
+	double x;
+	double y;
+	double z;
+	DVector(double L1 = 0, double L2 = 0, double L3 = 0) { x = L1; y = L2; z = L3; }
+};
+
+class NURBSpline      //Nurbs曲线各控制参数类
+{
+public:
+	int n; //控制点个数
+	int k;  //Nurbs阶次
+	//POINT *ControlPoint;  //控制点坐标
+	std::vector<POINT> ControlPoint;;
+	std::vector<double> U;
+	std::vector<double> w;
+	//double *U;  //Nurbs节点向量
+	//double *w;  //各节点权值
+
+	NURBSpline(int np, int kc)
+	{
+		if (np > 0 && kc > 0)
+		{
+			n = np;
+			k = kc;
+			ControlPoint.resize(n);
+			U.resize(n + k + 1);
+			w.resize(n);
+			//ControlPoint = new POINT[n];
+			//U = new double[n + k + 1];
+			//w = new double[n];
+		}
+		else
+		{
+			n = 0;
+			k = 0;
+			//ControlPoint = NULL;
+			//U = NULL;
+			//w = NULL;
+		}
+	}
+	~NURBSpline()
+	{
+		//delete[] ControlPoint;
+		//delete[] U;
+		//delete[] w;
+	}
+
+private:
+
+};
+
+//点到点之间的距离
+double PtoP_Dis(const POINT &P1, const POINT &P2);
+//向量模长
+double VectorLength(const DVector &v1);
+//向量叉乘
+DVector VecandVec_Mul(const DVector &v1, const DVector &v2);
+//向量点乘
+double VecandVec_Dotmul(const DVector &v1, const DVector &v2);
+//(p1-p0)与(p2-p0)的叉积的模（三维）
+double VandV_3DMul(const POINT &p1, const POINT &p2, const POINT &p0);
+//(p1-p0)与(p2-p0)的叉积(二维)
+double VandV_2DMul(const POINT &p1, const POINT &p2, const POINT &p0);
+//(p1-p0)与(p2-p0)的点乘
+double VandV_Dotmul(const POINT &p1, const POINT &p2, const POINT &p0);
+//(p1-p0)到(p2-p0)的逆时针夹角（二维）
+double VandV_Angle(const POINT &p1, const POINT &p2, const POINT &p0);
+//返回点1绕点0逆时针旋转alpha角度的点。二维绕点旋转，z值相同
+POINT Protation(const POINT &p1, const POINT &p0, double alpha);
+//点到线段的垂足的坐标
+POINT PtoLs_VtxLocation(const POINT &p1, const LINESEG &l1);
+//三维绕轴旋转，获得p1绕线段旋转后的点坐标，角度方向与<l.s, l.e>X<l.s, p1>的方向同边。
+POINT PBOLrotation(const POINT &P, const LINESEG &L, double alpha);
+//基函数计算，返回代入参数u值的基函数值。
+double Nurbs_BaseFun(const std::vector<double> & U, int k, int i, double u);
+//输入控制点数组，控制点数量，节点向量，节点权值，Nurbs阶次，参数u，返回Nurbs曲线上的点。
+POINT Circle_ContrlP(const std::vector<POINT> &ContrlP, int n, const std::vector<double> & U, const std::vector<double> & w, int k, double u);
+//取样每隔deltau的曲线点
+std::vector<POINT> Nurbs_CurvePoint(const NURBSpline & Spline, double deltau);
+//控制点反求step1，按各点间弦长比，求得各点处的参数u值
+std::vector<double> Nurbs_ChordLengthRatio(const std::vector<POINT> & SplinePoint, int n);
+//按节点间弦长比反求节点向量
+std::vector<double> Nurbs_PointVector(const std::vector<POINT> & SplinePoint, int n, int k);
+//控制点反求，列方程组求解控制点
+std::vector<POINT> Nurbs_ContrlPointSolve(const std::vector<POINT> & SplinePoint, int n, int k, const std::vector<double> &w, const DVector &D0, const DVector &D1);
+//高斯列主元消元法求线性方程组
+std::vector<double> Gaussin_L(const std::vector<std::vector<double>> &FuncA, const std::vector<double> &FuncB);
+//三点画圆弧，返回圆心
+POINT CircleCenter_ThreePoints(const POINT &p1, const POINT &p2, const POINT &p3);
+//三点画圆弧，返回半径
+double CircleRadius_ThreePoints(const POINT &p1, const POINT &p2, const POINT &p3);
+//输入圆心坐标，半径长度，u参数间隔，返回每间隔deltau的圆上的点。
+std::vector<POINT> CircleNurbs(const POINT &Circle_Center, double Radius, double deltau);
+//输入起始点，圆心，逆时针方向角度，u参数间隔，输出弧长开始点，结束点，返回每间隔deltau的弧上的点。
+std::vector<POINT> ArcNurbs_0to180(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Alpha, double deltau);    //弧长0-180度
+std::vector<POINT> ArcNurbs_180to360(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Alpha, double deltau);   //弧长180-360度
+//三点画弧，起点，终点，通过的点。
+std::vector<POINT> ArcNurbs_TP(const POINT &Arc_StartPoint, const POINT &Arc_ThroughPoint, const POINT &Arc_EndPoint, double deltau);
+
+//点到点之间的距离
+double PtoP_Dis(const POINT &P1, const POINT &P2)
+{
+	return (sqrt((P1.x - P2.x)*(P1.x - P2.x) + (P1.y - P2.y)*(P1.y - P2.y) + (P1.z - P2.z)*(P1.z - P2.z)));
+}
+
+//向量模长
+double VectorLength(const DVector &v1)
+{
+	return(sqrt(v1.x*v1.x + v1.y*v1.y + v1.z*v1.z));
+}
+
+//向量叉乘
+DVector VecandVec_Mul(const DVector &v1, const DVector &v2)
+{
+	DVector Vmul;
+	Vmul.x = v1.y*v2.z - v2.y*v1.z;
+	Vmul.y = v1.z*v2.x - v2.z*v1.x;
+	Vmul.z = v1.x*v2.y - v2.x*v1.y;
+	return Vmul;
+}
+
+//向量点乘
+double VecandVec_Dotmul(const DVector &v1, const DVector &v2)
+{
+	return(v1.x*v2.x + v1.y*v2.y + v1.z*v2.z);
+}
+
+//(p1-p0)与(p2-p0)的叉积的模（三维）
+double VandV_3DMul(const POINT &p1, const POINT &p2, const POINT &p0)
+{
+	double i = (p1.y - p0.y)*(p2.z - p0.z) - (p2.y - p0.y)*(p1.z - p0.z);
+	double j = (p2.x - p0.x)*(p1.z - p0.z) - (p1.x - p0.x)*(p2.z - p0.z);
+	double k = (p1.x - p0.x)*(p2.y - p0.y) - (p2.x - p0.x)*(p1.y - p0.y);
+	return (sqrt(i*i + j * j + k * k));
+}
+
+//(p1-p0)与(p2-p0)的叉积(二维)
+double VandV_2DMul(const POINT &p1, const POINT &p2, const POINT &p0)
+{
+	double k = (p1.x - p0.x)*(p2.y - p0.y) - (p2.x - p0.x)*(p1.y - p0.y);
+	return k;
+}
+
+//(p1-p0)与(p2-p0)的点乘
+double VandV_Dotmul(const POINT &p1, const POINT &p2, const POINT &p0)
+{
+	return ((p1.x - p0.x)*(p2.x - p0.x) + (p1.y - p0.y)*(p2.y - p0.y) + (p1.z - p0.z)*(p2.z - p0.z));
+	// >0,(p2-p0)与(p1-p0)成锐角；
+	// =0,(p2-p0)与(p1-p0)成直角；
+	// <0,(p2-p0)与(p1-p0)成钝角；
+}
+
+//(p1-p0)到(p2-p0)的逆时针夹角（二维）
+double VandV_Angle(const POINT &p1, const POINT &p2, const POINT &p0)
+{
+	double v1 = PtoP_Dis(p0, p1);
+	double v2 = PtoP_Dis(p0, p2);
+	double vv = VandV_Dotmul(p1, p2, p0);
+	double vxv = VandV_2DMul(p1, p2, p0);
+	double alpha = acos(vv / (v1*v2));
+	if (vxv < 0)  //判断夹角是否大于PI
+	{
+		alpha = 2 * PI - alpha;
+	}
+	return alpha;
+}
+
+//（v1*v2）=a1*a2*cos,(v1Xv2)=a1*a2*sin,v为向量，a为长度，联立求得解，alpha为xy平面夹角，z不参与计算。
+//二维绕点旋转，z值相同
+POINT Protation(const POINT &p1, const POINT &p0, double alpha)
+{
+	double x;
+	double y;
+	double z;
+	x = p0.x + (p1.x - p0.x)*cos(alpha) - (p1.y - p0.y)*sin(alpha);
+	y = p0.y + (p1.x - p0.x)*sin(alpha) + (p1.y - p0.y)*cos(alpha);
+	z = p1.z;
+	POINT p2 = { x,y,z };
+	return p2;
+}
+
+//点到线段的垂足的坐标
+POINT PtoLs_VtxLocation(const POINT &p1, const LINESEG &l1)
+{
+	double r = (VandV_Dotmul(p1, l1.e, l1.s)) / ((PtoP_Dis(l1.e, l1.s))*(PtoP_Dis(l1.e, l1.s)));
+	double x = r * (l1.e.x - l1.s.x) + l1.s.x;
+	double y = r * (l1.e.y - l1.s.y) + l1.s.y;
+	double z = r * (l1.e.z - l1.s.z) + l1.s.z;
+	POINT Pvtx = { x,y,z };
+	return Pvtx;
+}
+
+//三维绕轴旋转，获得p1绕线段旋转后的点坐标，角度方向与<l.s, l.e>X<l.s, p1>的方向同边。
+POINT PBOLrotation(const POINT &P, const LINESEG &L, double alpha)
+{
+	POINT p0 = PtoLs_VtxLocation(P, L);
+	DVector v0 = {
+	P.x - p0.x,
+	P.y - p0.y,
+	P.z - p0.z
+	};
+	DVector v1 = {
+	(L.e.x - p0.x) / PtoP_Dis(L.e, p0),
+	(L.e.y - p0.y) / PtoP_Dis(L.e, p0),
+	(L.e.z - p0.z) / PtoP_Dis(L.e, p0)
+	};
+	DVector v2 = VecandVec_Mul(v1, v0);
+	double x = v0.x*cos(alpha) + v2.x*sin(alpha) + p0.x;
+	double y = v0.y*cos(alpha) + v2.y*sin(alpha) + p0.y;
+	double z = v0.z*cos(alpha) + v2.z*sin(alpha) + p0.z;
+	POINT p1 = { x,y,z };
+	return p1;
+}
+
+
+
+//基函数值
+double Nurbs_BaseFun(const std::vector<double> & U, int k, int i, double u)
+{
+	double BaseValue;
+	if (k == 0)    //o次时，u在U[i]及U[i+1]之间时，N=1，其余为0。
+	{
+		if ((((u - U[i]) >= 0 || fabs(u - U[i]) <= EP)) && ((U[i + 1] - u) >= 0 || fabs(U[i + 1] - u) <= EP))
+		{
+			BaseValue = 1;
+		}
+		else
+		{
+			BaseValue = 0;
+		}
+	}
+	else if (k >= 1)  //大于1次时，递归计算基函数值。
+	{
+		if (fabs(U[i + k] - U[i]) <= EP && fabs(U[i + k + 1] - U[i + 1]) <= EP)
+		{
+			BaseValue = 0;
+		}
+		else if (fabs(U[i + k] - U[i]) <= EP && (U[i + k + 1] - U[i + 1]) != 0)
+		{
+			BaseValue = fabs(((U[i + k + 1] - u)*Nurbs_BaseFun(U, k - 1, i + 1, u)) / (U[i + k + 1] - U[i + 1]));
+		}
+		else if (fabs(U[i + k + 1] - U[i + 1]) <= EP && (U[i + k] - U[i]) != 0)
+		{
+			BaseValue = fabs(((u - U[i])*Nurbs_BaseFun(U, k - 1, i, u)) / (U[i + k] - U[i]));
+		}
+		else
+		{
+			BaseValue = fabs(((u - U[i])*Nurbs_BaseFun(U, k - 1, i, u)) / (U[i + k] - U[i]))
+				+ fabs(((U[i + k + 1] - u)*Nurbs_BaseFun(U, k - 1, i + 1, u)) / (U[i + k + 1] - U[i + 1]));
+		}
+	}
+	return BaseValue;
+}
+
+//返回Nurbs曲线点
+POINT Circle_ContrlP(const std::vector<POINT> & ContrlP, int n, const std::vector<double> & U, const std::vector<double> & w, int k, double u)
+{
+	using namespace std;
+	vector<double> A(n);
+	double x = 0.0;
+	double y = 0.0;
+	double z = 0.0;
+	double D = 0.0;
+	POINT SplinePoint;
+	for (int j = 0; j < n; j++)
+	{
+		A[j] = Nurbs_BaseFun(U, k, j, u);    //参数为u时，各基函数的值。
+		D = D + w[j] * A[j];                 //Nurbs的分母。
+	}
+	if (D != 0)
+	{
+		for (int i = 0; i < n; i++)
+		{
+			x = x + (A[i] * w[i] * ContrlP[i].x) / D;   //各点坐标乘以基函数值及权值。
+			y = y + (A[i] * w[i] * ContrlP[i].y) / D;
+			z = z + (A[i] * w[i] * ContrlP[i].z) / D;
+		}
+	}
+	SplinePoint.x = x;
+	SplinePoint.y = y;
+	SplinePoint.z = z;
+	return SplinePoint;
+}
+
+//取样每隔deltau的曲线点
+std::vector<POINT> Nurbs_CurvePoint(const NURBSpline & Spline, double deltau)
+{
+	std::vector<POINT> vct;
+	double u = 0;
+	//double k = Spline.U[Spline.n + Spline.k + 1];
+	while (1 - u > EP)
+	{
+		vct.push_back(Circle_ContrlP(Spline.ControlPoint, Spline.n, Spline.U, Spline.w, Spline.k, u));
+		u = u + deltau;
+	}
+	vct.push_back(Circle_ContrlP(Spline.ControlPoint, Spline.n, Spline.U, Spline.w, Spline.k, u));
+	return vct;
+}
+
+//控制点反求step1，按各点间弦长比，求得各点处的参数u值
+std::vector<double> Nurbs_ChordLengthRatio(const std::vector<POINT> & SplinePoint, int n)
+{
+	std::vector<double> alphau(n);
+	double d = 0;
+	for (int i = 1; i < n; i++)
+	{
+		d = d + PtoP_Dis(SplinePoint[i - 1], SplinePoint[i]);    //chord length method;
+		//d = d + sqrt(PtoP_Dis(SplinePoint[i - 1], SplinePoint[i]));    //centripetal method;
+	}
+	alphau[0] = 0;
+	for (int j = 1; j < n; j++)
+	{
+		alphau[j] = alphau[j - 1] + PtoP_Dis(SplinePoint[j - 1], SplinePoint[j]) / d;    //chord length method;
+		//alphau[j] = alphau[j - 1] + sqrt(PtoP_Dis(SplinePoint[j - 1], SplinePoint[j])) / d;    //centripetal method;
+	}
+	return alphau;
+}
+
+
+//控制点反求step2 ,按节点间弦长比反求节点向量
+std::vector<double> Nurbs_PointVector(const std::vector<POINT> & SplinePoint, int n, int k)
+{
+	using namespace std;
+	vector<double> alphau = Nurbs_ChordLengthRatio(SplinePoint, n);
+	vector<double> pointvector(n + k + 1);
+	double alpha;
+	for (int a = 0; a < k + 1; a++)
+	{
+		pointvector[a] = 0;
+	}
+	for (int b = k + 1; b < n + 1; b++)
+	{
+		alpha = 0;
+		for (int c = b - k; c < b; c++)
+		{
+			alpha = alpha + alphau[c];
+		}
+		pointvector[b] = alpha / k;
+	}
+	for (int d = n; d < n + k + 1; d++)
+	{
+		pointvector[d] = 1;
+	}
+	return pointvector;
+}
+
+//控制点反求step3，列方程组求解控制点
+std::vector<POINT> Nurbs_ContrlPointSolve(const std::vector<POINT> & SplinePoint, int n, int k, const std::vector<double> &w)
+{
+	using namespace std;
+	vector<double> U = Nurbs_PointVector(SplinePoint, n, k);  //节点向量
+	vector<double> up = Nurbs_ChordLengthRatio(SplinePoint, n);  //弦长比
+	vector<vector<double>> A(n);
+	vector<double> D(n);
+	vector<POINT> ControlPoint;
+	vector<vector<double>> FuncA(n);
+	vector<double> FuncB(n);
+	vector<double> FuncC(n);
+	vector<double> FuncD(n);
+	for (int i = 0; i < n; i++)
+	{
+		A[i].resize(n);
+	}
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			A[i][j] = Nurbs_BaseFun(U, k, j, up[i]);    //参数为u时，各基函数N(0,k)到N(n,k)的值。
+			D[i] = D[i] + w[j] * A[i][j];     //每一行的Nurbs的分母。
+		}
+	}
+	for (int i = 0; i < n; i++)
+	{
+		FuncA[i].resize(n);
+	}
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			FuncA[i][j] = A[i][j] * w[j] / D[i];
+		}
+	}
+	for (int j = 0; j < n; j++)
+	{
+		FuncB[j] = SplinePoint[j].x;
+		FuncC[j] = SplinePoint[j].y;
+		FuncD[j] = SplinePoint[j].z;
+	}
+	vector<double> PointX = Gaussin_L(FuncA, FuncB);
+	vector<double> PointY = Gaussin_L(FuncA, FuncC);
+	vector<double> PointZ = Gaussin_L(FuncA, FuncD);
+	for (int i = 0; i < n; i++)
+	{
+		ControlPoint.push_back(POINT(PointX[i], PointY[i], PointZ[i]));
+	}
+	return ControlPoint;
+}
+
+//Gaussin列主元消去法求线性方程组的解
+std::vector<double> Gaussin_L(const std::vector<std::vector<double>> &FuncA, const std::vector<double> &FuncB)
+{
+	using namespace std;
+	int row = FuncA.size();
+	int lin = FuncA[0].size();
+	double temp;
+	double d;
+	vector<double> Solve(row);
+
+	vector<vector<double>> FuncZG(row);  //矩阵的增广矩阵
+	for (int i = 0; i < row; i++)
+	{
+		FuncZG[i].resize(lin + 1);
+	}
+	for (int i = 0; i < row; i++)
+	{
+		for (int j = 0; j < lin; j++)
+		{
+			FuncZG[i][j] = FuncA[i][j];
+		}
+	}
+	for (int i = 0; i < row; i++)
+	{
+		FuncZG[i][lin] = FuncB[i];
+	}
+	
+
+	for (int k = 0; k < lin; k++)  //找主元最大值
+	{
+		double max = 0;
+		int hang = 0;
+		int num = 0;
+		for (int i = k; i < row; i++)
+		{
+			if (fabs(FuncZG[i][k]) > max)
+			{
+				max = fabs(FuncZG[i][k]);
+				hang = i;
+			}
+		}
+		if (FuncZG[hang][k] == 0)
+		{
+			cout << "Cannot Solve." << endl;
+			return Solve;
+		}
+		if (k != hang)    //交换行
+		{
+			for (int j = 0; j < lin + 1; j++)
+			{
+				temp = FuncZG[k][j];
+				FuncZG[k][j] = FuncZG[hang][j];
+				FuncZG[hang][j] = temp;
+			}
+		}
+	
+		for (int i = k + 1; i < row; i++)  //消元
+		{
+			d = FuncZG[i][k] / FuncZG[k][k];
+			for (int j = 0; j < lin + 1; j++)
+			{
+				FuncZG[i][j] = FuncZG[i][j] - d * FuncZG[k][j];
+			}
+		}
+				
+	}
+
+	for (int i = row - 1; i >= 0; i--)   //求解
+	{
+		d = 0;
+		for (int k = 0; k < lin; k++)
+		{
+			d = d + Solve[k] * FuncZG[i][k];
+		}
+		Solve[i] = (FuncZG[i][lin] - d) / FuncZG[i][i];
+	}
+	return Solve;
+}
+
+//三点画圆弧，返回圆心，xy平面
+POINT CircleCenter_ThreePoints(const POINT &p1, const POINT &p2, const POINT &p3)
+{
+	using namespace std;
+	double k1, b1, k2, b2, x, y;
+	if ((p1.x == p2.x && p1.y == p2.y) || (p1.x == p3.x && p1.y == p3.y) || (p3.x == p2.x && p3.y == p2.y))
+	{
+		cout << "Error, there are same points." << endl;
+	}
+	else if (p1.y == p2.y && p1.y == p3.y)
+	{
+		cout << "Error, collinear points." << endl;
+	}
+	else if (p1.y == p2.y)
+	{
+		k2 = (p2.x - p3.x) / (p3.y - p2.y);
+		b2 = (p2.x*p2.x + p2.y*p2.y - p3.x*p3.x - p3.y*p3.y) / (2 * (p2.y - p3.y));
+		x = (p1.x + p2.x) / 2;
+		y = k2 * x + b2;
+	}
+	else if (p2.y == p3.y)
+	{
+		k1 = (p1.x - p2.x) / (p2.y - p1.y);
+		b1 = (p1.x*p1.x + p1.y*p1.y - p2.x*p2.x - p2.y*p2.y) / (2 * (p1.y - p2.y));
+		x = (p2.x + p3.x) / 2;
+		y = k1 * x + b1;
+	}
+	else if (p1.y != p2.y && p2.y != p3.y)
+	{
+		k1 = (p1.x - p2.x) / (p2.y - p1.y);
+		b1 = (p1.x*p1.x + p1.y*p1.y - p2.x*p2.x - p2.y*p2.y) / (2 * (p1.y - p2.y));
+		k2 = (p2.x - p3.x) / (p3.y - p2.y);
+		b2 = (p2.x*p2.x + p2.y*p2.y - p3.x*p3.x - p3.y*p3.y) / (2 * (p2.y - p3.y));
+		if (k1 == k2)
+		{
+			cout << "Error, collinear points." << endl;
+		}
+		else
+		{
+			x = (b2 - b1) / (k1 - k2);
+			y = (k2 * b1 - k1 * b2) / (k2 - k1);
+		}
+	}
+	POINT p0;
+	p0.x = x;
+	p0.y = y;
+	return p0;
+}
+
+//三点画圆弧，返回半径，xy平面
+double CircleRadius_ThreePoints(const POINT &p1, const POINT &p2, const POINT &p3)
+{
+	POINT center = CircleCenter_ThreePoints(p1, p2, p3);
+	double radius = PtoP_Dis(p1, center);
+	return radius;
+}
+
+//输入圆的圆心，半径，画圆。2次9控制点，，xy平面
+std::vector<POINT> CircleNurbs(const POINT &Circle_Center, double Radius, double deltau)
+{
+	std::vector<POINT> vct;
+	std::vector<POINT> ContrlP =
+	{
+	{Circle_Center.x + Radius, Circle_Center.y, Circle_Center.z},
+	{Circle_Center.x + Radius, Circle_Center.y + Radius, Circle_Center.z},
+	{Circle_Center.x, Circle_Center.y + Radius, Circle_Center.z},
+	{Circle_Center.x - Radius, Circle_Center.y + Radius, Circle_Center.z},
+	{Circle_Center.x - Radius, Circle_Center.y, Circle_Center.z},
+	{Circle_Center.x - Radius, Circle_Center.y - Radius, Circle_Center.z},
+	{Circle_Center.x, Circle_Center.y - Radius, Circle_Center.z},
+	{Circle_Center.x + Radius, Circle_Center.y - Radius, Circle_Center.z},
+	{Circle_Center.x + Radius, Circle_Center.y, Circle_Center.z}
+	};
+	int n = 9;
+	std::vector<double> U = { 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4 };
+	std::vector<double> w = { 1, 0.707, 1, 0.707, 1, 0.707, 1, 0.707, 1 };
+	int k = 2;
+	double u = 0;
+	while (4 - u > EP)
+	{
+		vct.push_back(Circle_ContrlP(ContrlP, n, U, w, k, u));
+		u = u + 4 * deltau;
+	}
+	vct.push_back(Circle_ContrlP(ContrlP, n, U, w, k, u));
+	return vct;
+}
+
+//输入圆弧的开始点，圆心，弧度角度(Alpha > 0 && Alpha <= 180)，画弧。2次4控制点，xy平面
+std::vector<POINT> ArcNurbs_0to180(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Alpha, double deltau)
+{
+	using namespace std;
+	vector<POINT> vct;
+	POINT Arc_EndPoint = Protation(Arc_StartPoint, Arc_CircleCenter, Alpha);  //结束点
+	POINT Arc_MiddlePoint = Protation(Arc_StartPoint, Arc_CircleCenter, Alpha / 2);  //1/2处节点
+	POINT PointOrigin;   //插值前控制点
+	PointOrigin.x = ((Arc_MiddlePoint.x - Arc_CircleCenter.x) / cos(Alpha / 2)) + Arc_CircleCenter.x;
+	PointOrigin.y = ((Arc_MiddlePoint.y - Arc_CircleCenter.y) / cos(Alpha / 2)) + Arc_CircleCenter.y;
+
+	POINT ControlPoint1;  //插值后形成的控制点
+	POINT ControlPoint2;  //插值后形成的控制点
+
+	ControlPoint1.x = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.x - Arc_StartPoint.x) + Arc_StartPoint.x;
+	ControlPoint1.y = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.y - Arc_StartPoint.y) + Arc_StartPoint.y;
+
+	ControlPoint2.x = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.x - Arc_EndPoint.x) + Arc_EndPoint.x;
+	ControlPoint2.y = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.y - Arc_EndPoint.y) + Arc_EndPoint.y;
+
+	std::vector<POINT> ControlPoint =
+	{
+		Arc_StartPoint,
+		ControlPoint1,
+		ControlPoint2,
+		Arc_EndPoint
+	};
+
+	int n = 4;  //四个控制点
+	int k = 2;  //二次Nurbs
+	std::vector<double> U = { 0, 0, 0, 0.5, 1, 1, 1 };  // 1/2点处插值
+	std::vector<double> w = { 1,cos(Alpha / 4)*cos(Alpha / 4),cos(Alpha / 4)*cos(Alpha / 4),1 };  //四个权值
+	double u = 0;
+	while (1 - u > EP)
+	{
+		vct.push_back(Circle_ContrlP(ControlPoint, n, U, w, k, u));
+		u = u + deltau;
+	}
+	vct.push_back(Circle_ContrlP(ControlPoint, n, U, w, k, u));
+
+	cout << "Start Point: " << Arc_StartPoint.x << "  " << Arc_StartPoint.y << "  " << Arc_StartPoint.z << endl;
+	cout << "End Point: " << Arc_EndPoint.x << "  " << Arc_EndPoint.y << "  " << Arc_EndPoint.z << endl;
+
+	return vct;
+}
+
+//输入圆弧的开始点，圆心，弧度角度(Alpha > 180 && Alpha <= 360) ，画弧。 //插入1/2节点将弧线分为两段，xy平面
+std::vector<POINT> ArcNurbs_180to360(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Alpha, double deltau)
+{
+	using namespace std;
+	vector<POINT> vct;
+	vector<POINT> vct1;
+	vector<POINT> vct2;
+	double Alpha1 = Alpha / 2;
+	double Alpha2 = Alpha - Alpha1;
+	POINT Arc_InsertPoint = Protation(Arc_StartPoint, Arc_CircleCenter, Alpha1);  //插入的1/2处节点
+
+	vct1 = ArcNurbs_0to180(Arc_StartPoint, Arc_CircleCenter, Alpha1, deltau);
+	vct2 = ArcNurbs_0to180(Arc_InsertPoint, Arc_CircleCenter, Alpha2, deltau);
+	vct.insert(vct.end(), vct1.begin(), vct1.end());
+	vct.insert(vct.end(), vct2.begin() + 1, vct2.end());
+	return vct;
+}
+
+//三点画弧，起点，终点，通过的点。，xy平面
+std::vector<POINT> ArcNurbs_TP(const POINT &Arc_StartPoint, const POINT &Arc_ThroughPoint, const POINT &Arc_EndPoint, double deltau)
+{
+	std::vector<POINT> vct;
+	POINT temp;
+	temp.x = Arc_StartPoint.x;
+	temp.y = Arc_StartPoint.y;
+	temp.z = Arc_StartPoint.z;
+	POINT Arc_CiecleCenter = CircleCenter_ThreePoints(Arc_StartPoint, Arc_ThroughPoint, Arc_EndPoint);
+	std::cout << "ArcCircle center: " << Arc_CiecleCenter.x << "  " << Arc_CiecleCenter.y << "  " << Arc_CiecleCenter.z << std::endl;
+	double Alpha = VandV_Angle(Arc_StartPoint, Arc_EndPoint, Arc_CiecleCenter);
+
+	double yc = (Arc_StartPoint.y - Arc_EndPoint.y)*Arc_ThroughPoint.x / (Arc_StartPoint.x - Arc_EndPoint.x)
+		+ (Arc_EndPoint.x*Arc_StartPoint.y - Arc_StartPoint.x*Arc_EndPoint.y) / (Arc_EndPoint.x - Arc_StartPoint.x);
+	if (yc == Arc_ThroughPoint.y)
+	{
+		std::cout << "Collinear points.";
+	}
+	else
+	{
+		if (Arc_StartPoint.x < Arc_EndPoint.x)
+		{
+			if (yc < Arc_ThroughPoint.y)
+			{
+				temp.x = Arc_EndPoint.x;
+				temp.y = Arc_EndPoint.y;
+				temp.z = Arc_EndPoint.z;
+				Alpha = 2 * PI - Alpha;
+			}
+		}
+		else if (Arc_StartPoint.x > Arc_EndPoint.x)
+		{
+			if (yc > Arc_ThroughPoint.y)
+			{
+				temp.x = Arc_EndPoint.x;
+				temp.y = Arc_EndPoint.y;
+				temp.z = Arc_EndPoint.z;
+				Alpha = 2 * PI - Alpha;
+			}
+		}
+		else if (Arc_StartPoint.x - Arc_EndPoint.x < EP)
+		{
+			if (Arc_StartPoint.y > Arc_EndPoint.y)
+			{
+				if (Arc_ThroughPoint.x > Arc_StartPoint.x)
+				{
+					temp.x = Arc_EndPoint.x;
+					temp.y = Arc_EndPoint.y;
+					temp.z = Arc_EndPoint.z;
+					Alpha = 2 * PI - Alpha;
+				}
+			}
+			else if (Arc_StartPoint.y < Arc_EndPoint.y)
+			{
+				if (Arc_ThroughPoint.x < Arc_StartPoint.x)
+				{
+					temp.x = Arc_EndPoint.x;
+					temp.y = Arc_EndPoint.y;
+					temp.z = Arc_EndPoint.z;
+					Alpha = 2 * PI - Alpha;
+				}
+			}
+		}
+	}
+
+	if (Alpha > 0 && Alpha <= PI)
+	{
+		vct = ArcNurbs_0to180(temp, Arc_CiecleCenter, Alpha, deltau);
+	}
+	else if (Alpha > PI && Alpha <= 2 * PI)
+	{
+		vct = ArcNurbs_180to360(temp, Arc_CiecleCenter, Alpha, 2 * deltau);
+	}
+	return vct;
+}
+
+
+
+
+#endif
+#pragma once
