@@ -4,7 +4,50 @@
 #include <math.h>
 #include <vector>
 
+//测试曲面点采样
+int main()
+{
+	using namespace std;
+	int n = 4;
+	int m = 4;
+	int k = 2;
+	double deltau = 0.02;
 
+	NURBSCurvedSurface CS(n, m, k);
+	CS.ControlPoint[0] = { {10,0,0},{10,10,0},{-10,10,0},{-10,0,0} };
+	CS.ControlPoint[1] = { {10,0,10},{10,10,10},{-10,10,10},{-10,0,10} };
+	CS.ControlPoint[2] = { {10,0,20},{10,10,20},{-10,10,20},{-10,0,20} };
+	CS.ControlPoint[3] = { {10,0,30},{10,10,30},{-10,10,30},{-10,0,30} };
+
+
+	CS.Ui = { 0,0,0,0.5,1,1,1 };
+	CS.Uj = { 0,0,0,0.5,1,1,1 };
+	CS.w = {
+	{ 1,0.5,0.5,1 },
+	{ 1, 0.5, 0.5, 1 },
+	{ 1, 0.5, 0.5, 1 },
+	{ 1,0.5,0.5,1 }
+	};
+
+	double ui = 0.2;
+	double uj = 0.2;
+	POINT vct = Point_NurbsCurvedSurface(CS, ui, uj);
+	cout << "Point Coordinate: " << vct.x << "  " << vct.y << "  " << vct.z << endl;
+
+	double deltaui = 0.05;
+	double deltauj = 0.05;
+	vector<vector<POINT>> pvct = Nurbs_CurvePoint(CS, deltaui, deltauj);
+	cout << "Nurbs Curved Surface Coordinate: " << endl;
+	for (int j = 0; j < 21; j++)
+	{
+		for (int i = 0; i < 21; i++)
+		{
+			cout << "pvct[" << j << "][" << i << "]: " << pvct[j][i].x << "  " << pvct[j][i].y << "  " << pvct[j][i].z << endl;
+		}
+	}
+}
+
+/*
 //测试控制点反求
 int main()
 {
@@ -41,7 +84,7 @@ int main()
 		cout << "SplinePoint[ " << j << " ]: " << Spline[j].x << "  " << Spline[j].y << "  " << Spline[j].z << endl;
 	}
 }
-
+*/
 /*
 //测试曲线取样
 int main() 

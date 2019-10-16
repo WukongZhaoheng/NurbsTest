@@ -100,6 +100,10 @@ double Nurbs_BaseFun(const std::vector<double> & U, int k, int i, double u);
 POINT Circle_ContrlP(const std::vector<POINT> &ContrlP, int n, const std::vector<double> & U, const std::vector<double> & w, int k, double u);
 //取样每隔deltau的曲线点
 std::vector<POINT> Nurbs_CurvePoint(const NURBSpline & Spline, double deltau);
+//返回Nurbs曲面点
+POINT Point_NurbsCurvedSurface(const NURBSCurvedSurface & CurvedSurface, double ui, double uj);
+//采样Nurbs曲面点
+std::vector<std::vector<POINT>> Nurbs_CurvePoint(const NURBSCurvedSurface & CurvedSurface, double deltaui, double deltauj);
 //控制点反求step1，按各点间弦长比，求得各点处的参数u值
 std::vector<double> Nurbs_ChordLengthRatio(const std::vector<POINT> & SplinePoint, int n);
 //按节点间弦长比反求节点向量
@@ -326,6 +330,74 @@ std::vector<POINT> Nurbs_CurvePoint(const NURBSpline & Spline, double deltau)
 	vct.push_back(Circle_ContrlP(Spline.ControlPoint, Spline.n, Spline.U, Spline.w, Spline.k, u));
 	return vct;
 }
+
+//返回Nurbs曲面点
+POINT Point_NurbsCurvedSurface(const NURBSCurvedSurface & CurvedSurface, double ui, double uj)
+{
+	using namespace std;
+	std::vector<POINT> vct;
+	int n = CurvedSurface.ControlPoint[0].size();
+	int m = CurvedSurface.ControlPoint.size();
+
+	vector<double> A(n);
+	vector<double> B(m);
+	double x = 0.0;
+	double y = 0.0;
+	double z = 0.0;
+	double D = 0.0;
+	POINT SplinePoint;
+
+	for (int j = 0; j < m; j++)
+	{
+		B[j] = Nurbs_BaseFun(CurvedSurface.Uj, CurvedSurface.k, j, uj);  //j向参数为uj时，各基函数的值
+		for (int i = 0; i < n; i++)
+		{
+			A[i] = Nurbs_BaseFun(CurvedSurface.Ui, CurvedSurface.k, i, ui);    //i向参数为ui时，各基函数的值
+			D = D + CurvedSurface.w[j][i] * A[i] * B[j];                 //Nurbs的分母
+		}
+	}
+	if (D != 0)
+	{
+		for (int j = 0; j < m; j++)
+		{
+			for (int i = 0; i < n; i++)
+			{
+				x = x + (A[i] * B[j] * CurvedSurface.w[j][i] * CurvedSurface.ControlPoint[j][i].x) / D;   //各点坐标乘以基函数值及权值。
+				y = y + (A[i] * B[j] * CurvedSurface.w[j][i] * CurvedSurface.ControlPoint[j][i].y) / D;
+				z = z + (A[i] * B[j] * CurvedSurface.w[j][i] * CurvedSurface.ControlPoint[j][i].z) / D;
+			}
+		}
+	}
+	SplinePoint = { x,y,z };
+	return SplinePoint;
+}
+
+//采样Nurbs曲面点
+std::vector<std::vector<POINT>> Nurbs_CurvePoint(const NURBSCurvedSurface & CurvedSurface, double deltaui, double deltauj)
+{
+	int numi = 1 / deltaui + 1;
+	int numj = 1 / deltauj + 1;
+	std::vector<std::vector<POINT>> vct(numj);
+	for (int jj = 0; jj < numj; jj++)
+	{
+		vct[jj].resize(numi);
+	}
+	double ni = CurvedSurface.Ui[CurvedSurface.n + CurvedSurface.k];
+	double mj = CurvedSurface.Uj[CurvedSurface.m + CurvedSurface.k];
+	int j = 0;
+	for (double uj = 0; mj - uj + EP > 0; uj = uj + mj * deltauj)
+	{
+		int i = 0;
+		for (double ui = 0; ni - ui + EP > 0; ui = ui + ni * deltaui)
+		{
+			vct[j][i] = Point_NurbsCurvedSurface(CurvedSurface, ui, uj);
+			i = i + 1;
+		}
+		j = j + 1;
+	}
+	return vct;
+}
+
 
 //控制点反求step1，按各点间弦长比，求得各点处的参数u值
 std::vector<double> Nurbs_ChordLengthRatio(const std::vector<POINT> & SplinePoint, int n)
