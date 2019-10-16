@@ -72,6 +72,52 @@ public:
 private:
 };
 
+class NURBSCurvedSurface      //Nurbs曲面，[i，j]向Nurbs曲线构成曲面
+{
+public:
+	int n;  //i向控制点个数
+	int m;  //j向控制点个数
+	int k;  //Nurbs阶次
+
+	std::vector<std::vector<POINT>> ControlPoint;  //n*m控制点矩阵
+	std::vector<double> Ui;  //i向节点向量
+	std::vector<double> Uj;  //j向节点向量
+	std::vector<std::vector<double>> w;  //n*m节点权值矩阵
+
+	NURBSCurvedSurface(int np, int mp, int kc)
+	{
+		if (np > 0 && mp > 0 && kc > 0)
+		{
+			n = np;
+			m = mp;
+			k = kc;
+			ControlPoint.resize(m);
+			for (int j = 0; j < m; j++)
+			{
+				ControlPoint[j].resize(n);
+			}
+			Ui.resize(n + k + 1);
+			Uj.resize(m + k + 1);
+			w.resize(m);
+			for (int j = 0; j < m; j++)
+			{
+				w[j].resize(n);
+			}
+		}
+		else
+		{
+			n = 0;
+			k = 0;
+		}
+	}
+	~NURBSCurvedSurface()
+	{
+	}
+
+private:
+
+};
+
 //点到点之间的距离
 double PtoP_Dis(const POINT &P1, const POINT &P2);
 //向量模长
