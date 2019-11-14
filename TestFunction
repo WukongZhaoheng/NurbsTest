@@ -1,515 +1,259 @@
-#include "pch.h"
-#include "CalculationBase.h"
-#include <iostream>
-#include <math.h>
-#include <vector>
+// NURBSAPP.cpp : Nurbs特性。
+//
 
-//测试曲面点采样
+#include "pch.h"
+#include <iostream>
+#include <fstream>
+#include "CalculationBase.h"
+#include "NurbsBase.h"
+using namespace std;
+
 int main()
 {
-	using namespace std;
-	int n = 4;
-	int m = 4;
-	int k = 2;
-	double deltau = 0.02;
+	ofstream outFile;
+	outFile.open("NurbsDemo.txt");   //利用界面程序导入文本，显示相关点线面。
+	outFile.precision(4);
 
-	NURBSCurvedSurface CS(n, m, k);
-	CS.ControlPoint[0] = { {10,0,0},{10,10,0},{-10,10,0},{-10,0,0} };
-	CS.ControlPoint[1] = { {10,0,10},{10,10,10},{-10,10,10},{-10,0,10} };
-	CS.ControlPoint[2] = { {10,0,20},{10,10,20},{-10,10,20},{-10,0,20} };
-	CS.ControlPoint[3] = { {10,0,30},{10,10,30},{-10,10,30},{-10,0,30} };
+	//1. Nurbs曲线构造
+	//1.1 由各参数构成曲线类
+	int ni = 7;    //曲线控制点个数
+	int ki = 3;    //曲线阶次
+	NURBSpline Splinei(ni, ki);
+	Splinei.ControlPoint = { {10,0,0},{8,10,0},{20,15,0},{25,5,0},{30,-10,0},{45,-5,0},{50,15,0} };    //曲线控制点
+	Splinei.U = { 0,0,0,0,0.2,0.5,0.9,1,1,1,1 };    //曲线节点向量，两端k+1次重复，U[i]<=U[i+1]
+	Splinei.w = { 1,0.5,1,0.8,1,0.5,1 };        //曲线控制点权值
 
+	//1.2 Nurbs曲线上的点
+	double ui = 0.25;    //取值在U范围内的参数，对应曲线上的点
+	POINT PSplinei0 = Point_Nurbspline(Splinei, ui);    //曲线上的点P(0.25)
+	outFile << "TYPE=POINTS\n" << "COLOR=#ff5511\n";
+	outFile << "(" << PSplinei0.x << "," << PSplinei0.y << "," << PSplinei0.z << ")";
+	outFile << "\nEND\n\n";
 
+	//1.3 Nurbs曲线
+	double deltaui = 0.005;    //采样间隔，将u按取值范围分为(1/deltaui)段，取各点处的u值对应的点
+	int numi = int((1 / deltaui) + 1);
+	vector<POINT> SSplinei = Nurbs_CurvePoint(Splinei, deltaui);        //各u值对应的曲线点集，用于显示曲线
+	outFile << "TYPE=LINES\n" << "COLOR=#ffbb00\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << SSplinei[i].x << "," << SSplinei[i].y << "," << SSplinei[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+		//2. Nurbs圆锥曲线表达
+	//2.1 圆的Nurbs表达（二维曲线），二次Nurbs，默认z坐标为0，需要时做坐标换算
+	POINT CirCenter = { 10, 20, 0 };    //圆心坐标
+	double Radius = 30;                 //半径
+	vector<POINT> CirNurbs1 = CircleNurbs(CirCenter, Radius, deltaui);   //圆曲线点集
+	outFile << "TYPE=LINES\n" << "COLOR=#33ffdd\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << CirNurbs1[i].x << "," << CirNurbs1[i].y << "," << CirNurbs1[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+
+	//2.2 圆弧的Nurbs表达（二维曲线），二次Nurbs，默认z坐标为0，需要时做坐标换算
+	POINT ArcStartP = { 20, 10, 0 };    //圆弧的起始点
+	POINT ArcCenter = { 60, 10, 0 };    //圆弧的圆心
+	double ArcAngle1 = 100;             //圆弧角度，以起始点开始绕圆心逆时针的角度
+	double ArcAngle2 = 270;             //圆弧角度，以起始点开始绕圆心逆时针的角度
+	//按角度范围选择不同函数表达Nurbs圆弧
+	vector<POINT> ArcNurbs1 = ArcNurbs_0to180(ArcStartP, ArcCenter, ArcAngle1, deltaui);      //(0,180]度圆弧
+	vector<POINT> ArcNurbs2 = ArcNurbs_180to360(ArcStartP, ArcCenter, ArcAngle2, deltaui);    //[180,360]度圆弧
+	outFile << "TYPE=LINES\n" << "COLOR=#ff88c2\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << ArcNurbs1[i].x << "," << ArcNurbs1[i].y << "," << ArcNurbs1[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+
+	outFile << "TYPE=LINES\n" << "COLOR=#ffcccc\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << ArcNurbs2[i].x << "," << ArcNurbs2[i].y << "," << ArcNurbs2[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+
+	//三点作圆弧的Nurbs表达
+	POINT ArcStartPoint = { 20, 10, 0 };    //圆弧的起始点
+	POINT ArcMiddlePoint = { 40, 20, 0 };   //圆弧通过的某点
+	POINT ArcEndPoint = { 60, 40, 0 };      //圆弧的终点
+	vector<POINT> ArcNurbs3 = ArcNurbs_TP(ArcStartPoint, ArcMiddlePoint, ArcEndPoint, deltaui);            //从起始点开始，通过中间点，到达终点的圆弧
+	vector<POINT> CirNurbs2 = CirCleNurbs_TP(ArcStartPoint, ArcMiddlePoint, ArcEndPoint, deltaui);        //通过三点的圆
+	outFile << "TYPE=LINES\n" << "COLOR=#008866\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << ArcNurbs3[i].x << "," << ArcNurbs3[i].y << "," << ArcNurbs3[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+
+	outFile << "TYPE=LINES\n" << "COLOR=#ccddff\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << CirNurbs2[i].x << "," << CirNurbs2[i].y << "," << CirNurbs2[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+
+	//2.3 圆锥曲线Nurbs表示
+	int nc = 3;
+	int kc = 2;
+	double w1 = 1;
+	double w2 = 0.5;
+	double w3 = 1;
+	NURBSpline SplineConics(nc, kc);
+	SplineConics.ControlPoint = { {10,10,0},{30,80,0},{60,20,0} };
+	SplineConics.U = { 0,0,0,1,1,1 };
+	SplineConics.w = { w1,w2,w3 };
+	double ShapeControl = (w1*w3) / (w2*w2);   //形状不变因子
+	/*
+	ShapeControl = 0 :            直线段P1P2，P2P3
+	0 < ShapeControl < 1 :        双曲线
+	ShapeControl = 1 :            抛物线
+	1 < ShapeControl < 无穷大     椭圆
+	无穷大             直线P1P3
+	*/
+
+		//3.Nurbs曲面构造
+	//3.1 Nurbs曲面类，两个方向的节点向量、控制点/权值等构成
+	int na = 4;                //a向控制点个数
+	int nb = 4;                //b向控制点个数
+	int ka = 2;                //a向阶次
+	int kb = 2;                //b向阶次
+	NURBSCurvedSurface CS(na, ka, nb, kb);
+	CS.ControlPoint =
+	{
+	{ {10,0, 0},{10,10, 0},{-10,10, 0},{-10,0, 0} },
+	{ {10,0,10},{10,10,10},{-10,10,10},{-10,0,10} },
+	{ {10,0,20},{10,10,20},{-10,10,20},{-10,0,20} },
+	{ {10,0,30},{10,10,30},{-10,10,30},{-10,0,30} }
+	};
 	CS.Ui = { 0,0,0,0.5,1,1,1 };
 	CS.Uj = { 0,0,0,0.5,1,1,1 };
-	CS.w = {
-	{ 1,0.5,0.5,1 },
+	CS.w =
+	{
 	{ 1, 0.5, 0.5, 1 },
 	{ 1, 0.5, 0.5, 1 },
-	{ 1,0.5,0.5,1 }
+	{ 1, 0.5, 0.5, 1 },
+	{ 1, 0.5, 0.5, 1 }
 	};
 
-	double ui = 0.2;
-	double uj = 0.2;
-	POINT vct = Point_NurbsCurvedSurface(CS, ui, uj);
-	cout << "Point Coordinate: " << vct.x << "  " << vct.y << "  " << vct.z << endl;
+	//3.2 Nurbs曲面点
+	double ua = 0.2;
+	double ub = 0.2;
+	POINT vct = Point_NurbsCurvedSurface(CS, ua, ub);
+	outFile << "TYPE=POINTS\n" << "COLOR=#7744ff\n";
+	outFile << "(" << vct.x << "," << vct.y << "," << vct.z << ")";
+	outFile << "\nEND\n\n";
 
-	double deltaui = 0.05;
-	double deltauj = 0.05;
-	vector<vector<POINT>> pvct = Nurbs_CurvePoint(CS, deltaui, deltauj);
-	cout << "Nurbs Curved Surface Coordinate: " << endl;
-	for (int j = 0; j < 21; j++)
+	//3.3 采样曲面
+	double deltaua = 0.05;      //采样间隔
+	double deltaub = 0.05;      //采样间隔
+	int numa = int((1 / deltaua) + 1);
+	int numb = int((1 / deltaub) + 1);
+	vector<vector<POINT>> CurvedSurfaceNurbs1 = Nurbs_CurvedSurfacePoint(CS, deltaua, deltaub);
+	outFile << "TYPE=FACE\n" << "COLOR=#ff3333\n" << "COLOR=#ff44aa\n";
+	outFile << "ROW=" << numa << endl;
+	outFile << "COLUMN=" << numb << endl;
+	for (int j = 0; j < numb; j++)
 	{
-		for (int i = 0; i < 21; i++)
+		for (int i = 0; i < numa; i++)
 		{
-			cout << "pvct[" << j << "][" << i << "]: " << pvct[j][i].x << "  " << pvct[j][i].y << "  " << pvct[j][i].z << endl;
+			outFile << "(" << CurvedSurfaceNurbs1[i][j].x << "," << CurvedSurfaceNurbs1[i][j].y << "," << CurvedSurfaceNurbs1[i][j].z << ");";
 		}
+		outFile << "\n";
 	}
-}
+	outFile << "END\n\n";
 
-/*
-//测试控制点反求
-int main()
-{
-	using namespace std;
-	vector<POINT> SPo = { {10,0,0},{10,10,0},{0,10,0},{-10,10,0},{-10,0,0} };
-	
-	vector<double> w = { 1,1,1,1,1,1,1 };
-	int n = 5;
-	int k = 2;
-
-	vector<double> U;
-	U = Nurbs_PointVector(SPo, n, k);
-	for (int i = 0; i < n + k + 1; i++)
+	//3.4 由一条Nurbs曲线沿另一Nurbs曲线构成曲面（扫掠）
+	int nj = 4;
+	int kj = 2;
+	NURBSpline Splinej(nj, kj);
+	Splinej.ControlPoint = { {0,10,0},{0,10,10},{0,-10,10},{0,-10,0} };
+	Splinej.U = { 0,0,0,0.5,1,1,1 };
+	Splinej.w = { 1,0.5,0.5,1 };
+	NURBSCurvedSurface CS2 = Nurbs_SplineSweep(Splinei, Splinej);
+	vector<vector<POINT>> CurvedSurfaceNurbs2 = Nurbs_CurvedSurfacePoint(CS2, deltaua, deltaub);
+	outFile << "TYPE=FACE\n" << "COLOR=#ffff33\n" << "COLOR=#33ff33\n";
+	outFile << "ROW=" << numa << endl;
+	outFile << "COLUMN=" << numb << endl;
+	for (int j = 0; j < numb; j++)
 	{
-		cout << "U[" << i << "]:" << U[i] << endl;
+		for (int i = 0; i < numa; i++)
+		{
+			outFile << "(" << CurvedSurfaceNurbs2[i][j].x << "," << CurvedSurfaceNurbs2[i][j].y << "," << CurvedSurfaceNurbs2[i][j].z << ");";
+		}
+		outFile << "\n";
 	}
-	vector<POINT> FuncA =Nurbs_ContrlPointSolve(SPo, n, k, w);
+	outFile << "END\n\n";
 
-	for (int j = 0; j < n; j++)
+	//3.5 Nurbs平面:一次nurbs，节点向量[0,0,1,1]
+	int Nplanea = 2;
+	int Nplaneb = 2;
+	int kplanea = 1;
+	int kplaneb = 1;
+	NURBSCurvedSurface CSPlane(Nplanea, kplanea, Nplaneb, kplaneb);
+	CSPlane.ControlPoint =
 	{
-		cout << "ControlPoint[ " << j << " ]: " << FuncA[j].x << "  " << FuncA[j].y << "  " << FuncA[j].z << endl;
-	}
-
-	NURBSpline Sp(n,k);
-	Sp.ControlPoint = FuncA;
-	Sp.U = U;
-	Sp.w = w;
-	
-	double deltau = 0.05;
-	vector<POINT> Spline = Nurbs_CurvePoint(Sp, deltau);
-
-	for (int j = 0; j < 21; j++)
-	{
-		cout << "SplinePoint[ " << j << " ]: " << Spline[j].x << "  " << Spline[j].y << "  " << Spline[j].z << endl;
-	}
-}
-*/
-/*
-//测试曲线取样
-int main() 
-{
-	int n = 4;
-	int k = 2;
-	double deltau = 0.02;
-	using namespace std;
-	NURBSpline cc(n,k);
-	cc.ControlPoint = { {10,0,0},{10,10,0},{-10,10,0},{-10,0,0} };
-	cc.U = { 0,0,0,0.5,1,1,1 };
-	cc.w = { 1,0.5,0.5,1 };
-	vector<POINT> vct = Nurbs_CurvePoint(cc, deltau);
-	POINT center = { 0,0,0 };
-	for (int ii=0; ii<51; ii++)
-	{
-		cout << vct[ii].x << "  " << vct[ii].y << "  " << vct[ii].z << "  " << PtoP_Dis(vct[ii],center) << endl;
-	}
-}
-*/
-
-/*
-//测试Gauss消去法
-int main()
-{
-	std::vector<std::vector<double>> FuncA = {
-	{0.001, 2.000, 3.000},
-	{-1.000, 3.172, 4.623},
-	{-2.000, 1.072, 5.643}
+	{ {10,0,0},{10,10,0} },
+	{ {0,10,0},{0,0,0} }
 	};
-	std::vector<double> FuncB = { 1.000, 2.000, 3.000 };
-	std::vector<double> Solve = Gaussin_L(FuncA, FuncB);
-}
-*/
-
-/*
-//测试基函数矩阵
-int main()
-{
-	using namespace std;
-	POINT p0 = { 0,0,0 };
-	POINT p1 = { 3,4,0 };
-	POINT p2 = { -1,4,0 };
-	POINT p3 = { -4,0,0 };
-	POINT p4 = { -4,-3,0 };
-	POINT p5 = { -10,-10,0 };
-	POINT p6 = { 0,-10,0 };
-	POINT p7 = { 10,-10,0 };
-	POINT p8 = { 0,10,0 };
-	vector<POINT> CP = { p0,p1,p2,p3,p4 };
-	vector<double> w = { 1,1,1,1,1 };
-	int n = 5;
-	int k = 3;
-	vector<double> U;
-	U = Nurbs_PointVector(CP, n, k);
-	for (int i = 0; i < n + k + 1; i++)
+	CSPlane.Ui = { 0,0,1,1 };
+	CSPlane.Uj = { 0,0,1,1 };
+	CSPlane.w =
 	{
-		cout << "U[" << i << "]:" << U[i] << endl;
-	}
-	vector<vector<double>> FuncA = Nurbs_ContrlPointSolve(CP, n, k, w);
-	for (int i = 0; i < n; i++)
-	{
-		for (int j = 0; j < n; j++)
-		{
-			cout << "FuncA[ " << i << " ][ " << j << " ]: " << FuncA[i][j] << endl;
-		}
-	}
-}
-*/
-
-/*
-//测试节点向量反求
-int main()
-{
-	using namespace std;
-	POINT p0 = { 10,0,0 };
-	POINT p1 = { 10,10,0 };
-	POINT p2 = { 0,10,0 };
-	POINT p3 = { -10,10,0 };
-	POINT p4 = { -10,0,0 };
-	POINT p5 = { -10,-10,0 };
-	POINT p6 = { 0,-10,0 };
-	POINT p7 = { 10,-10,0 };
-	POINT p8 = { 0,10,0 };
-	vector<POINT> CP(5);
-	CP = { p0,p1,p2,p3,p4};
-	int n = 5;
-	int k = 2;
-	vector<double> U;
-	U = Nurbs_PointVector(CP, n, k);
-	for (int i=0; i<n+k+1; i++)
-	{
-		cout << "U[" << i << "]:" << U[i] << endl;
-	}
-}
-*/
-
-/*
-//显示圆的二次Nurbs曲线，输入圆心，半径。，xy平面
-void DrawCurve_CenterRadiusCircle()
-{
-	using namespace std;
-	POINT Circle_Center;
-	double Radius;
-	double deltau;
-	std::vector<POINT> retVct;
-	cout << "Please enter the x value of the center of circle: ";
-	cin >> Circle_Center.x;
-	cout << "Please enter the y value of the center of circle: ";
-	cin >> Circle_Center.y;
-	cout << "Please enter the z value of the center of circle: ";
-	cin >> Circle_Center.z;
-	cout << "Please enter the radius of circle: ";
-	cin >> Radius;
-	cout << "Please enter the deltau: ";
-	cin >> deltau;
-
-	if (Radius < 0 || deltau < 0 || deltau > 1)
-	{
-		cout << "Please enter the appropriate value." << endl;
-	}
-	else
-	{
-		int pointnumber = 1 / deltau + 1;
-		retVct = CircleNurbs(Circle_Center, Radius, deltau);
-
-		cout << "Circle center: " << Circle_Center.x << "  " << Circle_Center.y << "  " << Circle_Center.z << endl;
-		cout << "Radius: " << Radius << endl;
-
-		double *rtest = new double[pointnumber];
-		for (int j = 0; j < pointnumber; j++)
-		{
-			rtest[j] = PtoP_Dis(retVct[j], Circle_Center);
-		}
-		for (int i = 0; i < pointnumber; i++)
-		{
-			std::cout << "retVet[ " << i << "]: " << retVct[i].x << "  " << retVct[i].y << "  " << retVct[i].z << "  " << rtest[i] << std::endl;
-		}
-		delete[] rtest;
-	}
-}
-
-//显示圆的二次Nurbs曲线，输入三个点坐标。，xy平面
-void DrawCurve_ThreePointsCircle()
-{
-	using namespace std;
-	POINT Arc_StartPoint;  //开始点
-	POINT Arc_EndPoint;  //结束点
-	POINT Arc_ThroughPoint;  //通过的中间点
-	double deltau;  //显示曲线间隔
-	cout << "Please enter the x value of start point: ";
-	cin >> Arc_StartPoint.x;
-	cout << "Please enter the y value of start point: ";
-	cin >> Arc_StartPoint.y;
-	cout << "Please enter the z value of start point: ";
-	cin >> Arc_StartPoint.z;
-	cout << "Please enter the x value of second point: ";
-	cin >> Arc_ThroughPoint.x;
-	cout << "Please enter the y value of second point: ";
-	cin >> Arc_ThroughPoint.y;
-	cout << "Please enter the z value of second point: ";
-	cin >> Arc_ThroughPoint.z;
-	cout << "Please enter the x value of end point: ";
-	cin >> Arc_EndPoint.x;
-	cout << "Please enter the y value of end point: ";
-	cin >> Arc_EndPoint.y;
-	cout << "Please enter the z value of end point: ";
-	cin >> Arc_EndPoint.z;
-	cout << "Please enter the deltau: ";
-	cin >> deltau;
-
-	if (deltau < 0 || deltau > 1)
-	{
-		cout << "Please enter the appropriate value." << endl;
-	}
-	else
-	{
-		POINT center = CircleCenter_ThreePoints(Arc_StartPoint, Arc_ThroughPoint, Arc_EndPoint);
-		cout << "Circle center: " << center.x << "  " << center.y << "  " << center.z << endl;
-		double Radius = CircleRadius_ThreePoints(Arc_StartPoint, Arc_ThroughPoint, Arc_EndPoint);
-		cout << "Radius: " << Radius << endl;
-
-		int pointnumber = 1 / deltau + 1;
-		std::vector<POINT> retVct = CircleNurbs(center, Radius, deltau);
-
-		double *rtest = new double[pointnumber];
-		for (int j = 0; j < pointnumber; j++)
-		{
-			rtest[j] = PtoP_Dis(retVct[j], center);
-		}
-		for (int i = 0; i < pointnumber; i++)
-		{
-			cout << "retVct[ " << i << "]: " << retVct[i].x << "  " << retVct[i].y << "  " << retVct[i].z << "  " << rtest[i] << endl;
-		}
-		delete[] rtest;
-	}
-}
-
-//显示圆弧的二次Nurbs曲线，输入圆心、圆弧开始点、圆弧角。，xy平面
-void DrawCurve_AngleArc()
-{
-	using namespace std;
-	POINT Arc_CircleCenter;  //圆心
-	POINT Arc_StartPoint;  //开始点
-	double Alpha;  //弧度的角度
-	double deltau;  //显示曲线间隔
-	cout << "Please enter the x value of the center of circle: ";
-	cin >> Arc_CircleCenter.x;
-	cout << "Please enter the y value of the center of circle: ";
-	cin >> Arc_CircleCenter.y;
-	cout << "Please enter the z value of the center of circle: ";
-	cin >> Arc_CircleCenter.z;
-	cout << "Please enter the x value of start point: ";
-	cin >> Arc_StartPoint.x;
-	cout << "Please enter the y value of start point: ";
-	cin >> Arc_StartPoint.y;
-	cout << "Please enter the z value of start point: ";
-	cin >> Arc_StartPoint.z;
-	cout << "Please enter the angle of arc: ";
-	cin >> Alpha;
-	cout << "Please enter the deltau: ";
-	cin >> deltau;
-
-	if (Alpha < 0 || Alpha >360 || deltau < 0 || deltau > 1)
-	{
-		cout << "Please enter the appropriate value." << endl;
-	}
-	else
-	{
-		cout << "Circle center: " << Arc_CircleCenter.x << "  " << Arc_CircleCenter.y << "  " << Arc_CircleCenter.z << endl;
-		double Radius = PtoP_Dis(Arc_StartPoint, Arc_CircleCenter);
-		cout << "Radius: " << Radius << endl;
-
-		int pointnumber = (1 / deltau) + 1;
-		if (Alpha > 0 && Alpha <= 180)
-		{
-			Alpha = Alpha * PI / 180;  //角度转换为弧度
-			vector<POINT> vct = ArcNurbs_0to180(Arc_StartPoint, Arc_CircleCenter, Alpha, deltau);
-			double *rtest = new double[pointnumber];
-			for (int j = 0; j < pointnumber; j++)
-			{
-				rtest[j] = PtoP_Dis(Arc_CircleCenter, vct[j]);
-			}
-			for (int i = 0; i < pointnumber; i++)
-			{
-				cout << "vct[ " << i << "]: " << vct[i].x << "  " << vct[i].y << "  " << vct[i].z << "  " << rtest[i] << endl;
-			}
-			delete[] rtest;
-		}
-		else if (Alpha > 180 && Alpha <= 360)
-		{
-			Alpha = Alpha * PI / 180;  //角度转换为弧度
-			vector<POINT> vct = ArcNurbs_180to360(Arc_StartPoint, Arc_CircleCenter, Alpha, 2 * deltau);
-			double *rtest = new double[pointnumber];
-			for (int j = 0; j < pointnumber; j++)
-			{
-				rtest[j] = PtoP_Dis(Arc_CircleCenter, vct[j]);
-			}
-			for (int i = 0; i < pointnumber; i++)
-			{
-				cout << "vct[ " << i << "]: " << vct[i].x << "  " << vct[i].y << "  " << vct[i].z << "  " << rtest[i] << endl;
-			}
-			delete[] rtest;
-		}
-	}
-}
-
-//显示圆弧的二次Nurbs曲线，输入三个点坐标。，xy平面
-void DrawCurve_ThreePointsArc()
-{
-	using namespace std;
-	POINT Arc_StartPoint;  //开始点
-	POINT Arc_EndPoint;  //结束点
-	POINT Arc_ThroughPoint;  //通过的中间点
-	double deltau;  //显示曲线间隔
-	cout << "Please enter the x value of start point: ";
-	cin >> Arc_StartPoint.x;
-	cout << "Please enter the y value of start point: ";
-	cin >> Arc_StartPoint.y;
-	cout << "Please enter the z value of start point: ";
-	cin >> Arc_StartPoint.z;
-	cout << "Please enter the x value of second point: ";
-	cin >> Arc_ThroughPoint.x;
-	cout << "Please enter the y value of second point: ";
-	cin >> Arc_ThroughPoint.y;
-	cout << "Please enter the z value of second point: ";
-	cin >> Arc_ThroughPoint.z;
-	cout << "Please enter the x value of end point: ";
-	cin >> Arc_EndPoint.x;
-	cout << "Please enter the y value of end point: ";
-	cin >> Arc_EndPoint.y;
-	cout << "Please enter the z value of end point: ";
-	cin >> Arc_EndPoint.z;
-	cout << "Please enter the deltau: ";
-	cin >> deltau;
-
-	if (deltau < 0 || deltau > 1)
-	{
-		cout << "Please enter the appropriate value." << endl;
-	}
-	else
-	{
-		int pointnumber = 1 / deltau + 1;
-		vector<POINT> vct = ArcNurbs_TP(Arc_StartPoint, Arc_ThroughPoint, Arc_EndPoint, deltau);
-
-		POINT center = CircleCenter_ThreePoints(Arc_StartPoint, Arc_ThroughPoint, Arc_EndPoint);
-		cout << "Circle center: " << center.x << "  " << center.y << "  " << center.z << endl;
-		double Radius = CircleRadius_ThreePoints(Arc_StartPoint, Arc_ThroughPoint, Arc_EndPoint);
-		cout << "Radius: " << Radius << endl;
-		double *rtest = new double[pointnumber];
-		for (int j = 0; j < pointnumber; j++)
-		{
-			rtest[j] = PtoP_Dis(vct[j], center);
-		}
-		for (int i = 0; i < pointnumber; i++)
-		{
-			cout << "vct[ " << i << "]: " << vct[i].x << "  " << vct[i].y << "  " << vct[i].z << "  " << rtest[i] << endl;
-		}
-		delete[] rtest;
-	}
-}
-
-//选择画圆及圆弧方式。
-int main()
-{
-	using namespace std;
-	char choice1;
-	char choice2;
-	char choice3;
-	cout << "Choose from following options: (Q to quit)" << endl;
-	cout << "A. Draw a circle." << "\t" << "B. Draw an arc." << endl;
-	cin >> choice1;
-	while (cin.good())
-	{
-		if (choice1 == 'A')
-		{
-			cout << "Draw a circle by one of following options: (Q to quit)" << endl;
-			cout << "A. Center and radius." << "\t" << "B. Three points." << endl;
-			cin >> choice2;
-			if (choice2 == 'A')
-			{
-				DrawCurve_CenterRadiusCircle();
-			}
-			else if (choice2 == 'B')
-			{
-				DrawCurve_ThreePointsCircle();
-			}
-			else if (choice2 == 'Q')
-			{
-				break;
-			}
-			else
-			{
-				cout << "Please enter a usable choice." << endl;
-			}
-		}
-		else if (choice1 == 'B')
-		{
-			cout << "Draw an arc by one of following options: " << endl;
-			cout << "A. Center and start point and angle." << "\t" << "B. Three points." << endl;
-			cin >> choice3;
-			if (choice3 == 'A')
-			{
-				DrawCurve_AngleArc();
-			}
-			else if (choice3 == 'B')
-			{
-				DrawCurve_ThreePointsArc();
-			}
-			else if (choice3 == 'Q')
-			{
-				break;
-			}
-			else
-			{
-				cout << "Please enter a usable choice." << endl;
-			}
-		}
-		else if (choice1 == 'Q')
-		{
-			break;
-		}
-		else
-		{
-			cout << "Please enter a usable choice." << endl;
-		}
-		cout << "Choose from following options: (Q to quit)" << endl;
-		cout << "A. Draw a circle." << "\t" << "B. Draw an arc." << endl;
-		cin >> choice1;
-	}
-}
-
-//测试点绕空间轴线旋转
-int main()
-{
-	POINT po1 = { 4,0 };
-	POINT po2 = { 0,0 };
-	POINT po3 = { 0,4 };
-	LINESEG li1 = { po1,po3 };
-	double alpha = 0.8*PI;
-	POINT po4 = PBOLrotation(po2, li1, alpha);
-	POINT po5 = PtoLs_VtxLocation(po2, li1);
-
-	DVector v0 = {
-	po2.x - po5.x,
-	po2.y - po5.y,
-	po2.z - po5.z
+	{ 1, 1 },
+	{ 1, 1 }
 	};
-	DVector v1 = {
-	(po3.x - po5.x) / PtoP_Dis(po5, po3),
-	(po3.y - po5.y) / PtoP_Dis(po5, po3),
-	(po3.z - po5.z) / PtoP_Dis(po5, po3)
-	};
-	DVector v2 = VecandVec_Mul(v1, v0);
-	double x = v0.x*cos(alpha) + v2.x*sin(alpha) + po5.x;
-	double y = v0.y*cos(alpha) + v2.y*sin(alpha) + po5.y;
-	double z = v0.z*cos(alpha) + v2.z*sin(alpha) + po5.z;
-	POINT po6 = { x,y,z };
-	double length0 = VectorLength(v0);
-	double length1 = VectorLength(v1);
-	double length2 = VectorLength(v2);
 
-	std::cout << "p04:" << po4.x << "  " << po4.y << "  " << po4.z << std::endl;
-	std::cout << "p05:" << po5.x << "  " << po5.y << "  " << po5.z << std::endl;
-	std::cout << "p06:" << po6.x << "  " << po6.y << "  " << po6.z << std::endl;
-	std::cout << "Length:" << length0 << "  " << length1 << "  " << length2 << std::endl;
+	//3.6 Nurbs柱面:曲线沿向量拉伸为柱面
+	DVector Str = { 0,0,40 };
+	NURBSCurvedSurface CSCylinder = Nurbs_SplineStretch(Splinei, Str);
+
+	//3.7 Nurbs旋转：曲面绕轴旋转
+	LINESEG LSEG0 = { {0,-40,0} , {0,40,0} };    //空间任意轴，可以用轴上两点表示
+	NURBSCurvedSurface CSRevolution = Nurbs_SplineRotation(Splinei, LSEG0);
+
+	//3.8 Nurbs仿射：曲面相对点仿射
+	POINT Correla = { 10, 10, 10 };
+	DVector Sfactor = { 2, 2, 1 };
+	NURBSCurvedSurface CSScaling = Nurbs_SurfaceScaling(CS, Correla, Sfactor);
+
+	//4 Nurbs曲线反求
+	vector<POINT> SplinePoint = { { 0,0,0 },{ 3,4,0 },{ -1,4,0 },{ -4,0,0 },{ -4,-3,0 } };   //一系列曲线上的点
+	vector<double> wf = { 1,1,1,1,1 };   //各点处的权值，反求时通常默认为1
+	int nf = 5;
+	int kf = 3;
+	NURBSpline SplineF = Nurbs_SplineSolve(SplinePoint, nf, kf, wf);
+	vector<POINT> SSplinef = Nurbs_CurvePoint(SplineF, deltaui);
+	outFile << "TYPE=LINES\n" << "COLOR=#2200aa\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << SSplinef[i].x << "," << SSplinef[i].y << "," << SSplinef[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+
+	//5 插入节点
+	double unew = 0.3;
+	int r = 3;
+	NURBSpline SplineiNew = Nurbs_InsertKnot(Splinei, unew);  //插入单个节点
+	NURBSpline Splinej3 = Nurbs_InsertMulKnots(Splinei, unew, r);   //插入多重节点
+	vector<POINT> SSplineNew = Nurbs_CurvePoint(SplineiNew, deltaui);
+	outFile << "TYPE=LINES\n" << "COLOR=#ff00ff\n";
+	for (int i = 0; i < numi; i++)
+	{
+		outFile << "(" << SSplineNew[i].x << "," << SSplineNew[i].y << "," << SSplineNew[i].z << ");";
+	}
+	outFile << "\nEND\n\n";
+
+	//6 Nurbs曲线高阶导矢
+	int degree = 1;      //导矢阶次，不大于曲线次数
+	double uk = 0.4;          //求导处的曲线参数 
+	DVector NurbsDerivat = GetNurbsDerivat(degree, Splinei, uk);
+	POINT PSplineuk = Point_Nurbspline(Splinei, uk);
+	outFile << "TYPE=LINES\n" << "COLOR=#ff5511\n";
+	outFile << "(" << PSplineuk.x << "," << PSplineuk.y << "," << PSplineuk.z << ");(" << NurbsDerivat.x << "," << NurbsDerivat.y << "," << NurbsDerivat.z << ");";
+	outFile << "\nEND\n\n";
+
+	outFile.close();
+	return 0;
 }
-*/

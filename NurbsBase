@@ -1,0 +1,974 @@
+//#NurbsBase.h
+#ifndef NurbsBase
+#define NurbsBase
+#include <iostream>
+#include <math.h>
+#include <vector>
+#include <algorithm>
+#include "CalculationBase.h"
+
+class NURBSpline      //Nurbs曲线各控制参数类
+{
+public:
+	int n; //控制点个数
+	int k;  //Nurbs阶次
+	bool Closed;
+	std::vector<POINT> ControlPoint;
+	std::vector<double> U;
+	std::vector<double> w;
+
+	NURBSpline(int np, int kc, bool Clo = false)
+	{
+		if (np > 0 && kc > 0)
+		{
+			n = np;
+			k = kc;
+			ControlPoint.resize(n);
+			U.resize(n + k + 1);
+			w.resize(n);
+			Closed = Clo;
+		}
+		else
+		{
+			n = 0;
+			k = 0;
+			Closed = 0;
+		}
+	}
+	~NURBSpline()
+	{
+	}
+
+private:
+
+};
+
+class NURBSCurvedSurface      //Nurbs曲面，[i，j]向Nurbs曲线构成曲面
+{
+public:
+	int n;  //i向控制点个数
+	int ki;  //i向Nurbs阶次
+	int m;  //j向控制点个数
+	int kj;  //j向Nurbs阶次
+
+	std::vector<std::vector<POINT>> ControlPoint;  //n*m控制点矩阵
+	std::vector<double> Ui;  //i向节点向量
+	std::vector<double> Uj;  //j向节点向量
+	std::vector<std::vector<double>> w;  //n*m节点权值矩阵
+
+	NURBSCurvedSurface(int np, int kn, int mp, int km)
+	{
+		if (np > 0 && kn > 0 && mp > 0 && km > 0)
+		{
+			n = np;
+			ki = kn;
+			m = mp;
+			kj = km;
+			ControlPoint.resize(n);
+			for (int i = 0; i < n; i++)
+			{
+				ControlPoint[i].resize(m);
+			}
+			Ui.resize(n + ki + 1);
+			Uj.resize(m + kj + 1);
+			w.resize(n);
+			for (int i = 0; i < n; i++)
+			{
+				w[i].resize(m);
+			}
+		}
+		else
+		{
+			n = 0;
+			ki = 0;
+			m = 0;
+			kj = 0;
+		}
+	}
+	~NURBSCurvedSurface()
+	{
+	}
+
+private:
+
+};
+
+//基函数值
+double Nurbs_BaseFun(const std::vector<double> & U, int n, int k, int i, double u);
+//基函数矩阵
+std::vector<std::vector<double>> Nurbs_BasisFun(const std::vector<double> & U, int n, int k, double u);
+//返回Nurbs曲线点
+POINT Point_Nurbspline(const NURBSpline & Spline, double u);
+//取样每隔deltau的曲线点
+std::vector<POINT> Nurbs_CurvePoint(const NURBSpline & Spline, double deltau);
+//输入圆的圆心，半径，画圆。2次9控制点，，xy平面
+std::vector<POINT> CircleNurbs(const POINT &Circle_Center, double Radius, double deltau);
+//输入圆弧的开始点，圆心，弧度角度(Alpha > 0 && Alpha <= 180)，画弧。2次4控制点，xy平面
+std::vector<POINT> ArcNurbs_0to180(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Alpha, double deltau);
+//输入圆弧的开始点，圆心，弧度角度(Alpha > 180 && Alpha <= 360) ，画弧。 //插入1/2节点将弧线分为两段，xy平面
+std::vector<POINT> ArcNurbs_180to360(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Alpha, double deltau);
+//三点画圆，起点，终点，通过的点。，xy平面
+std::vector<POINT> CirCleNurbs_TP(const POINT &Circle_StartPoint, const POINT &Circle_ThroughPoint, const POINT &Circle_EndPoint, double deltau);
+//三点画弧，起点，终点，通过的点。，xy平面
+std::vector<POINT> ArcNurbs_TP(const POINT &Arc_StartPoint, const POINT &Arc_ThroughPoint, const POINT &Arc_EndPoint, double deltau);
+//两条不同向Nurbs曲线构成Nurbs曲面(扫掠)
+NURBSCurvedSurface Nurbs_SplineSweep(const NURBSpline & Sp1, const NURBSpline & Sp2);
+//Nurbs曲线沿向量C获得柱面（拉伸）
+NURBSCurvedSurface Nurbs_SplineStretch(const NURBSpline & Sp1, DVector d1);
+//Nurbs曲线绕轴旋转（旋转）
+NURBSCurvedSurface Nurbs_SplineRotation(const NURBSpline & Sp1, LINESEG lseg);
+//Nurbs曲面仿射
+NURBSCurvedSurface Nurbs_SurfaceScaling(const NURBSCurvedSurface & CS1, const POINT & Correla, DVector & Sfactor);
+//返回Nurbs曲面点
+POINT Point_NurbsCurvedSurface(const NURBSCurvedSurface & CurvedSurface, double ui, double uj);
+//采样Nurbs曲面点
+std::vector<std::vector<POINT>> Nurbs_CurvedSurfacePoint(const NURBSCurvedSurface & CurvedSurface, double deltaui, double deltauj);
+//控制点反求step1，按各点间弦长比，求得各点处的参数u值
+std::vector<double> Nurbs_ChordLengthRatio(const std::vector<POINT> & SplinePoint, int n);
+//按节点间弦长比反求节点向量
+std::vector<double> Nurbs_PointVector(const std::vector<POINT> & SplinePoint, int n, int k);
+//曲线点反求曲线，列方程组求解控制点
+NURBSpline Nurbs_SplineSolve(const std::vector<POINT> & SplinePoint, int n, int k, const std::vector<double> &w);
+//插入节点，插入节点影响范围权值设为1
+NURBSpline Nurbs_InsertKnot(const NURBSpline & Spline, double unew);
+//基函数导数矩阵
+std::vector<std::vector<double>> GetNurbsBaseFunDerivat(int r, const std::vector<double> & U, int n, int k, double u);
+//Nurbs导矢计算，Nurbs表达式分子的r阶导数
+DVector GetDenoDerivat(int r, const NURBSpline & Spline, double u);
+//Nurbs导矢计算，Nurbs表达式分母的r阶导数
+double GetNumeDerivat(int r, const NURBSpline & Spline, double u);
+//Nurbs曲线的r阶导矢
+DVector GetNurbsDerivat(int r, const NURBSpline & Spline, double u);
+
+
+//基函数值
+double Nurbs_BaseFun(const std::vector<double> & U, int n, int k, int i, double u)
+{
+	double BaseValue;
+	if (i > n-1)  //如果参数超过U向量范围
+	{
+		BaseValue = 0;
+	}
+	else
+	{
+		if (k == 0)    
+		/*
+		0次时，u在[U[i],U[i+1])之间时，N（i，k）=1，其余为0。
+		当u=U[max],N（n-1，0）=1，其余为0
+		*/
+		{
+			if (fabs(U[n+k] - u) < EP && i == n-1)
+			{
+				BaseValue = 1;
+			} 
+			else if ((((u - U[i]) > 0 || fabs(u - U[i]) < EP)) && ((U[i + 1] - u) > 0 ))
+			{
+				BaseValue = 1;
+			}
+			else
+			{
+				BaseValue = 0;
+			}
+		}
+		else if (k >= 1)  //大于1次时，递归计算基函数值。对系数是否为0进行判别。约定0/0=0
+		{
+			if (fabs(U[i + k] - U[i]) < EP && fabs(U[i + k + 1] - U[i + 1]) < EP)
+			{
+				BaseValue = 0;
+			}
+			else if (fabs(U[i + k] - U[i]) < EP && (U[i + k + 1] - U[i + 1]) != 0)
+			{
+				BaseValue = fabs(((U[i + k + 1] - u)*Nurbs_BaseFun(U,n, k - 1, i + 1, u)) / (U[i + k + 1] - U[i + 1]));
+			}
+			else if (fabs(U[i + k + 1] - U[i + 1]) < EP && (U[i + k] - U[i]) != 0)
+			{
+				BaseValue = fabs(((u - U[i])*Nurbs_BaseFun(U, n, k - 1, i, u)) / (U[i + k] - U[i]));
+			}
+			else
+			{
+				BaseValue = fabs(((u - U[i])*Nurbs_BaseFun(U, n, k - 1, i, u)) / (U[i + k] - U[i]))
+					+ fabs(((U[i + k + 1] - u)*Nurbs_BaseFun(U, n, k - 1, i + 1, u)) / (U[i + k + 1] - U[i + 1]));
+			}
+		}
+	}
+	return BaseValue;
+}
+
+//基函数矩阵
+std::vector<std::vector<double>> Nurbs_BasisFun(const std::vector<double> & U, int n, int k, double u)
+{
+	/*
+	创建一个n+1 X k+1矩阵，用于存储不同次数基函数值。
+	行数大于n时，N（i，k）为0，不参与计算。
+	列数从0-k，NurbsBasis[i][j]表示N（i，j）值。
+	*/
+	std::vector<std::vector<double>> NurbsBasis(n + 1);
+	for (int i = 0; i <= n; i++)
+	{
+		NurbsBasis[i].resize(k + 1);
+	}
+	for (int j = 0; j <= k; j++)
+	{
+		for (int ni = 0; ni <= n; ni++)
+		{
+			NurbsBasis[ni][j] = Nurbs_BaseFun(U, n, j, ni, u);
+		}
+	}
+	return NurbsBasis;
+}
+
+//返回Nurbs曲线点
+POINT Point_Nurbspline(const NURBSpline & Spline, double u)
+{
+	using namespace std;
+	POINT SplinePoint;
+	//计算基函数矩阵
+	std::vector<std::vector<double>> SpNBasis = Nurbs_BasisFun(Spline.U, Spline.n, Spline.k, u);
+	double Nx = 0.0;
+	double Ny = 0.0;
+	double Nz = 0.0;
+	double D = 0.0;
+	for (int j = 0; j < Spline.n; j++)
+	{
+		D = D + Spline.w[j] * SpNBasis[j][Spline.k];                 //Nurbs的分母。
+		Nx = Nx + Spline.w[j] * Spline.ControlPoint[j].x * SpNBasis[j][Spline.k];      //分子x分式
+		Ny = Ny + Spline.w[j] * Spline.ControlPoint[j].y * SpNBasis[j][Spline.k];
+		Nz = Nz + Spline.w[j] * Spline.ControlPoint[j].z * SpNBasis[j][Spline.k];
+	}
+	SplinePoint = { Nx / D,Ny / D,Nz / D };
+	return SplinePoint;
+}
+
+//取样每隔deltau的曲线点
+std::vector<POINT> Nurbs_CurvePoint(const NURBSpline & Spline, double deltau)
+{
+	std::vector<POINT> vct;
+	/*从U[min]到U[max]，将曲线参数u分为（1/deltau）段，取样分段处的曲线P（u）坐标*/
+	double u0 = Spline.U[0];
+	double u1 = Spline.U[Spline.n + Spline.k];
+	while (u1 - u0 > EP)
+	{
+		vct.push_back(Point_Nurbspline(Spline, u0));
+		u0 = u0 + (u1 - Spline.U[0]) * deltau;
+	}
+	vct.push_back(Point_Nurbspline(Spline, u0));
+	return vct;
+}
+
+//输入圆的圆心，半径，画圆。2次9控制点，，xy平面
+std::vector<POINT> CircleNurbs(const POINT &Circle_Center, double Radius, double deltau)
+{
+	std::vector<POINT> vct;
+	int n = 9;
+	int k = 2;
+	NURBSpline circle(n, k);
+	/*以圆心和半径构建正方形上的9个点为控制点*/
+	circle.ControlPoint =
+	{
+	{Circle_Center.x + Radius, Circle_Center.y, Circle_Center.z},
+	{Circle_Center.x + Radius, Circle_Center.y + Radius, Circle_Center.z},
+	{Circle_Center.x, Circle_Center.y + Radius, Circle_Center.z},
+	{Circle_Center.x - Radius, Circle_Center.y + Radius, Circle_Center.z},
+	{Circle_Center.x - Radius, Circle_Center.y, Circle_Center.z},
+	{Circle_Center.x - Radius, Circle_Center.y - Radius, Circle_Center.z},
+	{Circle_Center.x, Circle_Center.y - Radius, Circle_Center.z},
+	{Circle_Center.x + Radius, Circle_Center.y - Radius, Circle_Center.z},
+	{Circle_Center.x + Radius, Circle_Center.y, Circle_Center.z}
+	};
+	circle.U = { 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 4 };
+	circle.w = { 1, 0.707, 1, 0.707, 1, 0.707, 1, 0.707, 1 };
+	double u = 0;
+	/*曲线采样*/
+	while (4 - u > EP)
+	{
+		vct.push_back(Point_Nurbspline(circle, u));
+		u = u + 4 * deltau;
+	}
+	vct.push_back(Point_Nurbspline(circle, u));
+	return vct;
+}
+
+//输入圆弧的开始点，圆心，弧度角度(Alpha > 0 && Alpha <= 180)，画弧。2次4控制点，xy平面
+std::vector<POINT> ArcNurbs_0to180(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Deg, double deltau)
+{
+	using namespace std;
+	vector<POINT> vct;
+	double Alpha = Deg * PI / 180;		//角度转化为弧度
+	/*将u=U/2插入到节点向量中，根据原3个控制点计算出2次NURBS四个控制点*/
+	POINT Arc_EndPoint = Protation(Arc_StartPoint, Arc_CircleCenter, Alpha);  //结束点
+	POINT Arc_MiddlePoint = Protation(Arc_StartPoint, Arc_CircleCenter, Alpha / 2);  //1/2处节点
+	POINT PointOrigin;   //插点前控制点
+	PointOrigin.x = ((Arc_MiddlePoint.x - Arc_CircleCenter.x) / cos(Alpha / 2)) + Arc_CircleCenter.x;
+	PointOrigin.y = ((Arc_MiddlePoint.y - Arc_CircleCenter.y) / cos(Alpha / 2)) + Arc_CircleCenter.y;
+	POINT ControlPoint1;  //插点后形成的控制点
+	POINT ControlPoint2;  //插点后形成的控制点
+	ControlPoint1.x = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.x - Arc_StartPoint.x) + Arc_StartPoint.x;
+	ControlPoint1.y = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.y - Arc_StartPoint.y) + Arc_StartPoint.y;
+	ControlPoint2.x = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.x - Arc_EndPoint.x) + Arc_EndPoint.x;
+	ControlPoint2.y = (cos(Alpha / 2) / (1 + cos(Alpha / 2)))*(PointOrigin.y - Arc_EndPoint.y) + Arc_EndPoint.y;
+	int n = 4;  //四个控制点
+	int k = 2;  //二次Nurbs
+	NURBSpline circle(n, k);
+	circle.ControlPoint =
+	{
+	Arc_StartPoint,
+	ControlPoint1,
+	ControlPoint2,
+	Arc_EndPoint
+	};
+	circle.U = { 0, 0, 0, 0.5, 1, 1, 1 };  // 1/2点处插值
+	circle.w = { 1,cos(Alpha / 4)*cos(Alpha / 4),cos(Alpha / 4)*cos(Alpha / 4),1 };  //四个权值
+	double u = 0;
+	while (1 - u > EP)
+	{
+		vct.push_back(Point_Nurbspline(circle, u));
+		u = u + deltau;
+	}
+	vct.push_back(Point_Nurbspline(circle, u));
+	return vct;
+}
+
+//输入圆弧的开始点，圆心，弧度角度(Alpha > 180 && Alpha <= 360) ，画弧。 //插入1/2节点将弧线分为两段，xy平面
+std::vector<POINT> ArcNurbs_180to360(const POINT &Arc_StartPoint, const POINT &Arc_CircleCenter, double Deg, double deltau)
+{
+	using namespace std;
+	vector<POINT> vct;
+	vector<POINT> vct1;
+	vector<POINT> vct2;
+	/*将圆弧分为2段0-180度圆弧进行绘制*/
+	double Alpha1 = Deg / 2;
+	double Alpha2 = Deg - Alpha1;
+	double Alpha11 = Alpha1 * PI / 180;
+	POINT Arc_InsertPoint = Protation(Arc_StartPoint, Arc_CircleCenter, Alpha11);  //插入的1/2处节点
+
+	vct1 = ArcNurbs_0to180(Arc_StartPoint, Arc_CircleCenter, Alpha1, deltau);
+	vct2 = ArcNurbs_0to180(Arc_InsertPoint, Arc_CircleCenter, Alpha2, deltau);
+	vct.insert(vct.end(), vct1.begin(), vct1.end());
+	vct.insert(vct.end(), vct2.begin() + 1, vct2.end());
+	return vct;
+}
+
+//三点画圆，起点，终点，通过的点。，xy平面
+std::vector<POINT> CirCleNurbs_TP(const POINT &Circle_StartPoint, const POINT &Circle_ThroughPoint, const POINT &Circle_EndPoint, double deltau)
+{
+	/*求得圆心及半径值，绘制圆*/
+	POINT Center = CircleCenter_ThreePoints(Circle_StartPoint, Circle_ThroughPoint, Circle_EndPoint);
+	double Radius = CircleRadius_ThreePoints(Circle_StartPoint, Circle_ThroughPoint, Circle_EndPoint);
+	std::vector<POINT> vct = CircleNurbs(Center, Radius, deltau);
+	return vct;
+}
+
+//三点画弧，起点，终点，通过的点。，xy平面
+std::vector<POINT> ArcNurbs_TP(const POINT &Arc_StartPoint, const POINT &Arc_ThroughPoint, const POINT &Arc_EndPoint, double deltau)
+{
+	std::vector<POINT> vct;
+	POINT temp;
+	temp.x = Arc_StartPoint.x;
+	temp.y = Arc_StartPoint.y;
+	temp.z = Arc_StartPoint.z;
+	/*求得圆心*/
+	POINT Arc_CiecleCenter = CircleCenter_ThreePoints(Arc_StartPoint, Arc_ThroughPoint, Arc_EndPoint);
+	/*三点形成的向量夹角*/
+	double Alpha = VandV_Angle(Arc_StartPoint, Arc_EndPoint, Arc_CiecleCenter);
+	/*根据始末点形成的弦上，中间点的对应点，判断弧的方向，变换相应起始点及角度*/
+	double yc = (Arc_StartPoint.y - Arc_EndPoint.y)*Arc_ThroughPoint.x / (Arc_StartPoint.x - Arc_EndPoint.x)
+		+ (Arc_EndPoint.x*Arc_StartPoint.y - Arc_StartPoint.x*Arc_EndPoint.y) / (Arc_EndPoint.x - Arc_StartPoint.x);
+	if (yc == Arc_ThroughPoint.y)
+	{
+		std::cout << "Collinear points.";
+	}
+	else
+	{
+		if (Arc_StartPoint.x < Arc_EndPoint.x)
+		{
+			if (yc < Arc_ThroughPoint.y)
+			{
+				temp.x = Arc_EndPoint.x;
+				temp.y = Arc_EndPoint.y;
+				temp.z = Arc_EndPoint.z;
+				Alpha = 2 * PI - Alpha;
+			}
+		}
+		else if (Arc_StartPoint.x > Arc_EndPoint.x)
+		{
+			if (yc > Arc_ThroughPoint.y)
+			{
+				temp.x = Arc_EndPoint.x;
+				temp.y = Arc_EndPoint.y;
+				temp.z = Arc_EndPoint.z;
+				Alpha = 2 * PI - Alpha;
+			}
+		}
+		else if (Arc_StartPoint.x - Arc_EndPoint.x < EP)
+		{
+			if (Arc_StartPoint.y > Arc_EndPoint.y)
+			{
+				if (Arc_ThroughPoint.x > Arc_StartPoint.x)
+				{
+					temp.x = Arc_EndPoint.x;
+					temp.y = Arc_EndPoint.y;
+					temp.z = Arc_EndPoint.z;
+					Alpha = 2 * PI - Alpha;
+				}
+			}
+			else if (Arc_StartPoint.y < Arc_EndPoint.y)
+			{
+				if (Arc_ThroughPoint.x < Arc_StartPoint.x)
+				{
+					temp.x = Arc_EndPoint.x;
+					temp.y = Arc_EndPoint.y;
+					temp.z = Arc_EndPoint.z;
+					Alpha = 2 * PI - Alpha;
+				}
+			}
+		}
+	}
+	double Alpha11 = Alpha * 180 / PI;
+	if (Alpha11 > 0 && Alpha11 <= 180)
+	{
+		vct = ArcNurbs_0to180(temp, Arc_CiecleCenter, Alpha11, deltau);
+	}
+	else if (Alpha11 > 180 && Alpha11 <= 360)
+	{
+		vct = ArcNurbs_180to360(temp, Arc_CiecleCenter, Alpha11, 2 * deltau);
+	}
+	return vct;
+}
+
+//两条不同向Nurbs曲线构成Nurbs曲面(扫掠)
+NURBSCurvedSurface Nurbs_SplineSweep(const NURBSpline & Sp1, const NURBSpline & Sp2)
+{
+	int n = Sp1.n;
+	int ki = Sp1.k;
+	int m = Sp2.n;
+	int kj = Sp2.k;
+	std::vector<DVector> DD(m);
+	NURBSCurvedSurface NurbSC(n, ki, m, kj);
+	/*使i向控制点相对位置与Sp1相同*/
+	for (int i = 0; i < n; i++)
+	{
+		NurbSC.ControlPoint[i][0] = Sp1.ControlPoint[i];
+		NurbSC.w[i][0] = Sp1.w[i] * Sp2.w[0];
+	}
+	/*使j向控制点相对位置与Sp2相同*/
+	/*权值为i向j向权值乘积*/
+	for (int j = 1; j < m; j++)
+	{
+		DD[j] = PtoP_Vector(Sp2.ControlPoint[j - 1], Sp2.ControlPoint[j]);
+		for (int i = 0; i < n; i++)
+		{
+			NurbSC.ControlPoint[i][j] = Point_Move(Sp1.ControlPoint[i], DD[j]);
+			NurbSC.w[i][j] = Sp1.w[i] * Sp2.w[j];
+		}
+	}
+	NurbSC.Ui = Sp1.U;
+	NurbSC.Uj = Sp2.U;
+	return NurbSC;
+}
+
+//Nurbs曲线沿向量C获得柱面（拉伸）
+NURBSCurvedSurface Nurbs_SplineStretch(const NURBSpline & Sp1, DVector d1)
+{
+	NURBSCurvedSurface NurbSSC(Sp1.n, Sp1.k, 2, 1);
+	/*使i向控制点相对位置与Sp1相同*
+	/*增加j向1次NURBS（直线）*/
+	for (int i = 0; i < Sp1.n; i++)
+	{
+		NurbSSC.ControlPoint[i][0] = Sp1.ControlPoint[i];
+		NurbSSC.w[i][0] = Sp1.w[i];
+		NurbSSC.ControlPoint[i][1] = Point_Move(Sp1.ControlPoint[i], d1);
+		NurbSSC.w[i][1] = Sp1.w[i];
+	}
+	NurbSSC.Ui = Sp1.U;
+	NurbSSC.Uj = { 0,0,1,1 };
+	return NurbSSC;
+}
+
+//Nurbs曲线绕轴旋转（旋转）
+NURBSCurvedSurface Nurbs_SplineRotation(const NURBSpline & Sp1, LINESEG lseg)
+{
+	NURBSCurvedSurface NurbSR(Sp1.n, Sp1.k, 9, 2);
+	std::vector<POINT> Pedal(Sp1.n);
+	/*使i向控制点相对位置与Sp1相同*
+	/*增加j向2次NURBS（圆），相应控制点由Sp1控制点绕轴形成正方形*/
+	for (int i = 0; i < Sp1.n; i++)
+	{
+		/*p（i）在轴上的投影*/
+		Pedal[i] = PtoLs_VtxLocation(Sp1.ControlPoint[i], lseg);
+		/*投影点到P（i）形成的向量*/
+		DVector v0 = PtoP_Vector(Pedal[i], NurbSR.ControlPoint[i][0]);
+		/*轴的单位向量*/
+		DVector LSEG1 = VectorUnit(PtoP_Vector(lseg.s, lseg.e));
+		/*叉乘获得法向向量*/
+		DVector v1 = VecandVec_Mul(v0, LSEG1);
+		/*根据相互垂直的v0，v1向量获得各控制点坐标*/
+		NurbSR.ControlPoint[i][0] = Sp1.ControlPoint[i];
+		NurbSR.ControlPoint[i][1] = { v0.x + v1.x + Pedal[i].x, v0.y + v1.y + Pedal[i].y, v0.z + v1.z + Pedal[i].z };
+		NurbSR.ControlPoint[i][2] = { v1.x + Pedal[i].x, v1.y + Pedal[i].y, v1.z + Pedal[i].z };
+		NurbSR.ControlPoint[i][3] = { v1.x - v0.x + Pedal[i].x, v1.y - v0.y + Pedal[i].y, v1.z - v0.z + Pedal[i].z };
+		NurbSR.ControlPoint[i][4] = { Pedal[i].x - v0.x, Pedal[i].y - v0.y, Pedal[i].z - v0.z };
+		NurbSR.ControlPoint[i][5] = { Pedal[i].x - v0.x - v1.x, Pedal[i].y - v0.y - v1.y, Pedal[i].z - v0.z - v1.z };
+		NurbSR.ControlPoint[i][6] = { Pedal[i].x - v1.x, Pedal[i].y - v1.y, Pedal[i].z - v1.z };
+		NurbSR.ControlPoint[i][7] = { v0.x - v1.x + Pedal[i].x, v0.y - v1.y + Pedal[i].y, v0.z - v1.z + Pedal[i].z };
+		NurbSR.ControlPoint[i][8] = Sp1.ControlPoint[i];
+	}
+	NurbSR.Ui = Sp1.U;
+	NurbSR.Uj = { 0,0,0,0.25,0.25,0.5,0.5,0.75,0.75,1,1,1 };
+	double w[9] = { 1,0.707,1,0.707,1,0.707,1,0.707,1 };
+	/*权值为i向j向权值乘积*/
+	for (int j = 0; j < NurbSR.m; j++)
+	{
+		for (int i = 0; i < NurbSR.n; i++)
+		{
+			NurbSR.w[i][j] = Sp1.w[i] * w[j];
+		}
+	}
+	return NurbSR;
+}
+
+//Nurbs曲面仿射
+NURBSCurvedSurface Nurbs_SurfaceScaling(const NURBSCurvedSurface & CS1, const POINT & Correla, DVector & Sfactor)
+{
+	NURBSCurvedSurface CS2(CS1.n, CS1.ki, CS1.m, CS1.kj);
+	/*节点向量与权值不变*/
+	CS2.Ui = CS1.Ui;
+	CS2.Uj = CS1.Uj;
+	CS2.w = CS1.w;
+	/*控制点坐标相对原始点进行仿射*/
+	for (int i = 0; i < CS1.n; i++)
+	{
+		for (int j = 0; j < CS1.m; j++)
+		{
+			CS2.ControlPoint[i][j].x = Sfactor.x * CS1.ControlPoint[i][j].x + (1 - Sfactor.x) * CS2.w[i][j] * Correla.x;
+			CS2.ControlPoint[i][j].y = Sfactor.y * CS1.ControlPoint[i][j].y + (1 - Sfactor.y) * CS2.w[i][j] * Correla.y;
+			CS2.ControlPoint[i][j].z = Sfactor.z * CS1.ControlPoint[i][j].z + (1 - Sfactor.z) * CS2.w[i][j] * Correla.z;
+		}
+	}
+	return CS2;
+}
+
+//返回Nurbs曲面点
+POINT Point_NurbsCurvedSurface(const NURBSCurvedSurface & CurvedSurface, double ui, double uj)
+{
+	using namespace std;
+	POINT SurfacePoint;
+	/*获得i向j向基函数值*/
+	std::vector<std::vector<double>> CsNBasis1 = Nurbs_BasisFun(CurvedSurface.Ui, CurvedSurface.n, CurvedSurface.ki, ui);
+	std::vector<std::vector<double>> CsNBasis2 = Nurbs_BasisFun(CurvedSurface.Uj, CurvedSurface.m, CurvedSurface.kj, uj);
+	/*
+	Nx,Ny,Nz分别存储Nurbs曲面表达式的分子x/y/z
+	D存储Nurbs曲面表达式的分母
+	*/
+	double Nx = 0.0;
+	double Ny = 0.0;
+	double Nz = 0.0;
+	double D = 0.0;
+	for (int i = 0; i < CurvedSurface.n; i++)
+	{
+		for (int j = 0; j < CurvedSurface.m; j++)
+		{
+			Nx = Nx + CurvedSurface.w[i][j] * CurvedSurface.ControlPoint[i][j].x * CsNBasis1[i][CurvedSurface.ki] * CsNBasis2[j][CurvedSurface.kj];                 
+			Ny = Ny + CurvedSurface.w[i][j] * CurvedSurface.ControlPoint[i][j].y * CsNBasis1[i][CurvedSurface.ki] * CsNBasis2[j][CurvedSurface.kj];
+			Nz = Nz + CurvedSurface.w[i][j] * CurvedSurface.ControlPoint[i][j].z * CsNBasis1[i][CurvedSurface.ki] * CsNBasis2[j][CurvedSurface.kj];
+			D = D + CurvedSurface.w[i][j] * CsNBasis1[i][CurvedSurface.ki] * CsNBasis2[j][CurvedSurface.kj];
+		}
+	}
+	SurfacePoint = { Nx / D,Ny / D,Nz / D };
+	return SurfacePoint;
+}
+
+//采样Nurbs曲面点
+std::vector<std::vector<POINT>> Nurbs_CurvedSurfacePoint(const NURBSCurvedSurface & CurvedSurface, double deltaui, double deltauj)
+{
+	/*ij向采样次数，为避免double值尾数产生的误差*/
+	int numi = ceil(1 / deltaui + 1.5) - 1;
+	int numj = ceil(1 / deltauj + 1.5) - 1;
+	std::vector<std::vector<POINT>> vct(numi);
+	for (int ii = 0; ii < numi; ii++)
+	{
+		vct[ii].resize(numj);
+	}
+	//i，j向节点向量范围
+	double n0 = CurvedSurface.Ui[0];
+	double ni = CurvedSurface.Ui[CurvedSurface.n + CurvedSurface.ki];
+	double m0 = CurvedSurface.Uj[0];
+	double mj = CurvedSurface.Uj[CurvedSurface.m + CurvedSurface.kj];
+	//对i，j向分段点进行采样
+	int j = 0;
+	for (double uj = m0; mj - uj + EP > 0; uj = uj + (mj - m0) * deltauj)
+	{
+		int i = 0;
+		for (double ui = n0; ni - ui + EP > 0; ui = ui + (ni - n0) * deltaui)
+		{
+			vct[i][j] = Point_NurbsCurvedSurface(CurvedSurface, ui, uj);
+			i = i + 1;
+		}
+		j = j + 1;
+	}
+	return vct;
+}
+
+//控制点反求step1，按各点间弦长比，求得各点处的参数u值
+std::vector<double> Nurbs_ChordLengthRatio(const std::vector<POINT> & SplinePoint, int n)
+{
+	std::vector<double> alphau(n);
+	double d = 0;
+	for (int i = 1; i < n; i++)
+	{
+		//d = d + PtoP_Dis(SplinePoint[i - 1], SplinePoint[i]);    //chord length method;
+		d = d + sqrt(PtoP_Dis(SplinePoint[i - 1], SplinePoint[i]));    //centripetal method;
+	}
+	alphau[0] = 0;
+	for (int j = 1; j < n; j++)
+	{
+		//alphau[j] = alphau[j - 1] + PtoP_Dis(SplinePoint[j - 1], SplinePoint[j]) / d;    //chord length method;
+		alphau[j] = alphau[j - 1] + sqrt(PtoP_Dis(SplinePoint[j - 1], SplinePoint[j])) / d;    //centripetal method;
+	}
+	return alphau;
+}
+
+//按节点间弦长比反求节点向量
+std::vector<double> Nurbs_PointVector(const std::vector<POINT> & SplinePoint, int n, int k)
+{
+	using namespace std;
+	vector<double> alphau = Nurbs_ChordLengthRatio(SplinePoint, n);
+	vector<double> pointvector(n + k + 1);
+	double alpha;
+	for (int a = 0; a < k + 1; a++)
+	{
+		pointvector[a] = 0;
+	}
+	for (int b = k + 1; b < n + 1; b++)
+	{
+		alpha = 0;
+		for (int c = b - k; c < b; c++)
+		{
+			alpha = alpha + alphau[c];
+		}
+		pointvector[b] = alpha / k;
+	}
+	for (int d = n; d < n + k + 1; d++)
+	{
+		pointvector[d] = 1;
+	}
+	return pointvector;
+}
+
+//曲线点反求曲线，列方程组求解控制点
+NURBSpline Nurbs_SplineSolve(const std::vector<POINT> & SplinePoint, int n, int k, const std::vector<double> &w)
+{
+	using namespace std;
+	vector<double> D(n);
+	vector<vector<double>> FuncA(n);  //系数矩阵
+	vector<double> FuncB;  //控制点x矩阵
+	vector<double> FuncC;  //控制点y矩阵
+	vector<double> FuncD;  //控制点z矩阵
+	NURBSpline Spline(n, k);
+	Spline.U = Nurbs_PointVector(SplinePoint, n, k);  //节点向量
+	Spline.w = w;  //节点权值
+	vector<double> up = Nurbs_ChordLengthRatio(SplinePoint, n);  //弦长比
+	std::vector<std::vector<std::vector<double>>> SpNBasis(n);
+	for (int i = 0; i < n; i++)
+	{
+		SpNBasis[i] = Nurbs_BasisFun(Spline.U, Spline.n, Spline.k, up[i]);
+	}
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			D[i] = D[i] + w[j] * SpNBasis[i][j][Spline.k];     //每一行的Nurbs的分母。
+		}
+	}
+	for (int i = 0; i < n; i++)
+	{
+		for (int j = 0; j < n; j++)
+		{
+			FuncA[i].push_back(SpNBasis[i][j][Spline.k] * w[j] / D[i]);
+		}
+	}
+	for (int j = 0; j < n; j++)
+	{
+		FuncB.push_back(SplinePoint[j].x);
+		FuncC.push_back(SplinePoint[j].y);
+		FuncD.push_back(SplinePoint[j].z);
+	}
+	vector<double> PointX = Gaussin_L(FuncA, FuncB);
+	vector<double> PointY = Gaussin_L(FuncA, FuncC);
+	vector<double> PointZ = Gaussin_L(FuncA, FuncD);
+	for (int i = 0; i < n; i++)
+	{
+		Spline.ControlPoint[i] = POINT(PointX[i], PointY[i], PointZ[i]);
+	}
+	return Spline;
+}
+
+//插入节点，插入节点影响范围权值设为1
+NURBSpline Nurbs_InsertKnot(const NURBSpline & Spline, double unew)
+{
+	int nn;
+	for (int i = 0; i < Spline.n + Spline.k; i++)
+	{
+		if (unew >= Spline.U[i] && unew < Spline.U[i + 1])
+		{
+			nn = i;
+		}
+	}
+	std::vector<double> a(Spline.n + 1);
+	NURBSpline NewSpline(Spline.n + 1, Spline.k);
+	for (int j = 0; j < nn - Spline.k + 1; j++)
+	{
+		a[j] = 1;
+		NewSpline.ControlPoint[j] = Spline.ControlPoint[j];
+		NewSpline.w[j] = Spline.w[j];
+	}
+	for (int j = nn - Spline.k + 1; j < nn + 1; j++)
+	{
+		if ((Spline.U[j + Spline.k] - Spline.U[j]) == 0)
+		{
+			a[j] = 0;
+		}
+		else
+		{
+			a[j] = (unew - Spline.U[j]) / (Spline.U[j + Spline.k] - Spline.U[j]);
+		}
+
+		NewSpline.ControlPoint[j].x = Spline.w[j] * Spline.ControlPoint[j].x * (a[j]) + Spline.w[j - 1] * Spline.ControlPoint[j - 1].x * (1 - a[j]);
+		NewSpline.ControlPoint[j].y = Spline.w[j] * Spline.ControlPoint[j].y * (a[j]) + Spline.w[j - 1] * Spline.ControlPoint[j - 1].y * (1 - a[j]);
+		NewSpline.ControlPoint[j].z = Spline.w[j] * Spline.ControlPoint[j].z * (a[j]) + Spline.w[j - 1] * Spline.ControlPoint[j - 1].z * (1 - a[j]);
+		NewSpline.w[j] = 1;
+	}
+	for (int j = nn + 1; j < Spline.n + 1; j++)
+	{
+		a[j] = 0;
+		NewSpline.ControlPoint[j] = Spline.ControlPoint[j - 1];
+		NewSpline.w[j] = Spline.w[j - 1];
+	}
+	for (int j = 0; j < nn + 1; j++)
+	{
+		NewSpline.U[j] = Spline.U[j];
+	}
+	NewSpline.U[nn + 1] = unew;
+	for (int u = nn + 2; u < Spline.n + Spline.k + 2; u++)
+	{
+		NewSpline.U[u] = Spline.U[u - 1];
+	}
+	return NewSpline;
+}
+
+//插入节点r次，插入节点影响范围权值设为1
+NURBSpline Nurbs_InsertMulKnots(const NURBSpline & Spline, double unew, int r)
+{
+	/*unew应在（U[0],U[n+k]）之间。插入节点后该处节点重复度应小于等于k*/
+	int nn;
+	int s = 0;
+	for (int i = 0; i < Spline.n + Spline.k; i++)
+	{
+		if (unew >= Spline.U[i] && unew < Spline.U[i + 1])
+		{
+			nn = i;
+		}
+	}
+	if (unew == Spline.U[nn])
+	{
+		for (int i = nn; i > 0; i--)
+		{
+			if (unew == Spline.U[i])
+			{
+				s = s + 1;
+			}
+		}
+	}
+	std::vector<std::vector<POINT>> CtrlPntChg(Spline.k + 1 - s);
+	std::vector<std::vector<double>> Afac(Spline.k + 1 - s);
+	for (int i = 0; i < Spline.k + 1 - s; i++)
+	{
+		CtrlPntChg[i].resize(r + 1);
+		Afac[i].resize(r + 1);
+		CtrlPntChg[i][0].x = Spline.ControlPoint[nn - Spline.k + i + s].x * Spline.w[nn - Spline.k + i + s];
+		CtrlPntChg[i][0].y = Spline.ControlPoint[nn - Spline.k + i + s].y * Spline.w[nn - Spline.k + i + s];
+		CtrlPntChg[i][0].z = Spline.ControlPoint[nn - Spline.k + i + s].z * Spline.w[nn - Spline.k + i + s];
+	}
+	for (int j = 1; j < r + 1; j++)
+	{
+		for (int i = j; i < Spline.k + 1 - s; i++)
+		{
+			if ((Spline.U[nn + s + i - j + 1] - Spline.U[nn - Spline.k + s + i]) < EP)
+			{
+				Afac[i][j] = 0;
+			}
+			else
+			{
+				Afac[i][j] = (unew - Spline.U[nn - Spline.k + s + i]) / (Spline.U[nn + s + i - j + 1] - Spline.U[nn - Spline.k + s + i]);
+			}
+			CtrlPntChg[i][j].x = Afac[i][j] * CtrlPntChg[i][j - 1].x + (1 - Afac[i][j]) * CtrlPntChg[i - 1][j - 1].x;
+			CtrlPntChg[i][j].y = Afac[i][j] * CtrlPntChg[i][j - 1].y + (1 - Afac[i][j]) * CtrlPntChg[i - 1][j - 1].y;
+			CtrlPntChg[i][j].z = Afac[i][j] * CtrlPntChg[i][j - 1].z + (1 - Afac[i][j]) * CtrlPntChg[i - 1][j - 1].z;
+		}
+	}
+	NURBSpline NewSpline(Spline.n + r, Spline.k);
+	/*
+	前0到nn-k+s保持不变与原控制点相同。
+	*/
+	for (int j = 0; j < nn - Spline.k + 1 + s; j++)
+	{
+		NewSpline.ControlPoint[j] = Spline.ControlPoint[j];
+		NewSpline.w[j] = Spline.w[j];
+	}
+	/*
+	中间（k-s+r-1）个点替换掉原（k-s-1）个点。
+	*/
+	for (int j = nn - Spline.k + 1 + s; j < nn - Spline.k + s + r; j++)
+	{
+		NewSpline.ControlPoint[j] = CtrlPntChg[j - nn + Spline.k - s][j - nn + Spline.k - s];
+		NewSpline.w[j] = 1;
+	}
+	for (int j = nn - Spline.k + s + r; j < nn + 1; j++)
+	{
+		NewSpline.ControlPoint[j] = CtrlPntChg[j - nn + Spline.k - s][r];
+		NewSpline.w[j] = 1;
+	}
+	for (int j = nn + 1; j < nn + r; j++)
+	{
+		NewSpline.ControlPoint[j] = CtrlPntChg[Spline.k - s][nn + r - j];
+		NewSpline.w[j] = 1;
+	}
+	/*
+	后面nn+r到n+r-1点与原控制点相同。
+	*/
+	for (int j = nn + r; j < Spline.n + r; j++)
+	{
+		NewSpline.ControlPoint[j] = Spline.ControlPoint[j - r];
+		NewSpline.w[j] = Spline.w[j - r];
+	}
+	/*
+	节点向量插入r次unew。
+	*/
+	for (int j = 0; j < nn + 1; j++)
+	{
+		NewSpline.U[j] = Spline.U[j];
+	}
+	for (int j = nn + 1; j < nn + r + 1; j++)
+	{
+		NewSpline.U[j] = unew;
+	}
+	for (int u = nn + r + 1; u < Spline.n + Spline.k + r + 1; u++)
+	{
+		NewSpline.U[u] = Spline.U[u - r];
+	}
+	return NewSpline;
+}
+
+//基函数导数矩阵
+std::vector<std::vector<double>> GetNurbsBaseFunDerivat(int r, const std::vector<double> & U, int n, int k, double u)
+{
+	std::vector<std::vector<double>> NurbsDerivat(r + n);
+	std::vector<std::vector<double>> d1(r + n);
+	std::vector<std::vector<double>> d2(r + n);
+	for (int i = 0; i < r + n; i++)
+	{
+		NurbsDerivat[i].resize(1 + r);
+		d1[i].resize(1 + r);
+		d2[i].resize(1 + r);
+	}
+	std::vector<std::vector<double>> NurbsBasis = Nurbs_BasisFun(U, n, k, u);
+	int mm = NurbsBasis.size();
+	for (int i = 0; i < mm; i++)
+	{
+		NurbsDerivat[i][0] = NurbsBasis[i][k - r];
+	}
+	if (r > 0)
+	{
+		for (int j = 1; j < r + 1; j++)
+		{
+			for (int i = 0; i < n + r - j; i++)
+			{
+				if (U[i + j] - U[i] < EP && U[i + j + 1] - U[i + 1] < EP)
+				{
+					d1[i][j] = 0;
+					d2[i][j] = 0;
+				}
+				else if (U[i + j] - U[i] < EP && U[i + j + 1] - U[i + 1] != 0)
+				{
+					d1[i][j] = 0;
+					d2[i][j] = 1 / (U[i + j + 1] - U[i + 1]);
+				}
+				else if (U[i + j] - U[i] != 0 && U[i + j + 1] - U[i + 1] < EP)
+				{
+					d1[i][j] = 1 / (U[i + j] - U[i]);
+					d2[i][j] = 0;
+				}
+				else
+				{
+					d1[i][j] = 1 / (U[i + j] - U[i]);
+					d2[i][j] = 1 / (U[i + j + 1] - U[i + 1]);
+				}
+				NurbsDerivat[i][j] = (k - r + j) * (d1[i][j] * NurbsDerivat[i][j - 1] - d2[i][j] * NurbsDerivat[i + 1][j - 1]);
+			}
+		}
+	}
+	return NurbsDerivat;
+}
+
+//Nurbs导矢计算，Nurbs表达式分子的r阶导数
+DVector GetDenoDerivat(int r, const NURBSpline & Spline, double u)
+{
+	std::vector<std::vector<double>> NurbsDerivat = GetNurbsBaseFunDerivat(r, Spline.U, Spline.n, Spline.k, u);
+	DVector Denor = { 0,0,0 };
+	for (int j = 0; j < Spline.n; j++)
+	{
+		Denor.x = Denor.x + NurbsDerivat[j][r] * Spline.w[j] * Spline.ControlPoint[j].x;
+		Denor.y = Denor.y + NurbsDerivat[j][r] * Spline.w[j] * Spline.ControlPoint[j].y;
+		Denor.z = Denor.z + NurbsDerivat[j][r] * Spline.w[j] * Spline.ControlPoint[j].z;
+	}
+	return Denor;
+}
+
+//Nurbs导矢计算，Nurbs表达式分母的r阶导数
+double GetNumeDerivat(int r, const NURBSpline & Spline, double u)
+{
+	std::vector<std::vector<double>> NurbsDerivat = GetNurbsBaseFunDerivat(r, Spline.U, Spline.n, Spline.k, u);
+	double Numr = 0;
+	for (int j = 0; j < Spline.n; j++)
+	{
+		Numr = Numr + NurbsDerivat[j][r] * Spline.w[j];
+	}
+	return Numr;
+}
+
+//Nurbs曲线的r阶导矢
+DVector GetNurbsDerivat(int r, const NURBSpline & Spline, double u)
+{
+	std::vector<std::vector<double>> NurbsBasis = Nurbs_BasisFun(Spline.U, Spline.n, Spline.k, u);
+	DVector Nur = { 0,0,0 };
+	double Xik = 0;
+	double Yik = 0;
+	double Zik = 0;
+	if (r == 0)
+	{
+		Nur.x = Point_Nurbspline(Spline, u).x;
+		Nur.y = Point_Nurbspline(Spline, u).y;
+		Nur.z = Point_Nurbspline(Spline, u).z;
+	}
+	else if (r > 0)
+	{
+		for (int j = 1; j < r + 1; j++)
+		{
+			Xik = Xik + Factorial(r) / (Factorial(r - j)*Factorial(j)) * GetNumeDerivat(j, Spline, u) * GetNurbsDerivat(r - j, Spline, u).x;
+			Yik = Yik + Factorial(r) / (Factorial(r - j)*Factorial(j)) * GetNumeDerivat(j, Spline, u) * GetNurbsDerivat(r - j, Spline, u).y;
+			Zik = Zik + Factorial(r) / (Factorial(r - j)*Factorial(j)) * GetNumeDerivat(j, Spline, u) * GetNurbsDerivat(r - j, Spline, u).z;
+		}
+		double ww = 0;
+		for (int i = 0; i < Spline.n; i++)
+		{
+			ww = ww + Spline.w[i] * NurbsBasis[i][Spline.k];
+		}
+		Nur.x = (GetDenoDerivat(r, Spline, u).x - Xik) / ww;
+		Nur.y = (GetDenoDerivat(r, Spline, u).y - Yik) / ww;
+		Nur.z = (GetDenoDerivat(r, Spline, u).z - Zik) / ww;
+	}
+	return Nur;
+}
+
+
+#endif
+#pragma once
