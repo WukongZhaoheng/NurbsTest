@@ -1,0 +1,72 @@
+//基函数矩阵
+std::vector<std::vector<double>> Nurbs_BasisFun(const std::vector<double> & U, int n, int k, double u)
+{
+	/*
+	创建一个n+1 X k+1矩阵，用于存储不同次数基函数值，减少计算次数。
+	行数大于n时，N（i，k）为0，不参与计算。
+	列数从0-k，NurbsBasis[i][j]表示N（i，j）值。
+	*/
+	std::vector<std::vector<double>> NurbsBasis(n + 1);
+	/*
+	d1/d2存储N(i,k)基函数计算时展开的N(i,k-1),N(i-1,k-1)的系数。
+	*/
+	std::vector<std::vector<double>> d1(n + 1);
+	std::vector<std::vector<double>> d2(n + 1);
+	for (int i = 0; i <= n; i++)
+	{
+		NurbsBasis[i].resize(k + 1);
+		d1[i].resize(k + 1);
+		d2[i].resize(k + 1);
+	}
+	int m;
+	if (fabs(u - U[0]) < EP)
+	{
+		//如果u等于节点向量的最小值，NurbsBasis[0][k] = 1;
+		m = k;
+	}
+	else if (fabs(u - U[n + k]) < EP)
+	{
+		//如果u等于节点向量的最大值，NurbsBasis[n - 1][k] = 1;
+		m = n - 1;
+	}
+	else//获得0列的基函数值为1时的行值
+	{
+		for (int ii = 0; ii < n; ii++)
+		{
+			if ((u - U[ii] > 0 && U[ii + 1] - u > 0) || (u - U[ii] < EP && U[ii + 1] - u > 0))
+			{
+				m = ii;
+				break;
+			}
+		}
+	}
+	NurbsBasis[m][0] = 1;
+	/*从列开始计算后续列的值，对系数是否为0进行判断*/
+	for (int j = 1; j <= k; j++)
+	{
+		for (int i = m; i >= m - j; i--)
+		{
+			if (U[i + j] - U[i] < EP && U[i + j + 1] - U[i + 1] < EP)
+			{
+				d1[i][j] = d2[i][j] = 0;
+			}
+			else if (U[i + j] - U[i] < EP && U[i + j + 1] - U[i + 1] != 0)
+			{
+				d1[i][j] = 0;
+				d2[i][j] = (U[i + j + 1] - u) / (U[i + j + 1] - U[i + 1]);
+			}
+			else if (U[i + j + 1] - U[i + 1] < EP && U[i + j] - U[i] != 0)
+			{
+				d2[i][j] = 0;
+				d1[i][j] = (u - U[i]) / (U[i + j] - U[i]);
+			}
+			else
+			{
+				d1[i][j] = (u - U[i]) / (U[i + j] - U[i]);
+				d2[i][j] = (U[i + j + 1] - u) / (U[i + j + 1] - U[i + 1]);
+			}
+			NurbsBasis[i][j] = d1[i][j] * NurbsBasis[i][j - 1] + d2[i][j] * NurbsBasis[i + 1][j - 1];
+		}
+	}
+	return NurbsBasis;
+}
